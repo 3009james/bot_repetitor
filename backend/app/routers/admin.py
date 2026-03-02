@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db import get_session
 from app.dependencies import require_admin
+from app.bot import notify_admin_cancellation, notify_student_cancellation
 from app.models import AvailabilitySlot, Booking, User
 from app.routers.public import get_or_create_profile
 from app.schemas import BookingListItem, ProfileUpdate, SlotCreate, SlotOut, TutorProfileOut
@@ -152,3 +153,42 @@ async def list_bookings(
         for booking, user, slot in rows
     ]
 
+
+@router.delete("/bookings/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_booking(
+    booking_id: int,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> None:
+    result = await session.execute(
+        select(Booking, User, AvailabilitySlot)
+        .join(User, Booking.user_id == User.id)
+        .join(AvailabilitySlot, Booking.slot_id == AvailabilitySlot.id)
+        .where(Booking.id == booking_id)
+        .limit(1)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена")
+
+    booking, user, slot = row
+    slot_start = slot.start_at.astimezone().strftime("%d.%m.%Y %H:%M")
+    slot_end = slot.end_at.astimezone().strftime("%H:%M")
+
+    await session.delete(booking)
+    await session.commit()
+
+    await notify_admin_cancellation(
+        student_name=user.first_name,
+        student_username=user.username,
+        student_telegram_id=user.telegram_id,
+        start_at=slot_start,
+        end_at=slot_end,
+        cancelled_by="администратор",
+    )
+    await notify_student_cancellation(
+        telegram_id=user.telegram_id,
+        start_at=slot_start,
+        end_at=slot_end,
+        cancelled_by="администратор",
+    )

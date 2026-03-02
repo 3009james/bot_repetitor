@@ -111,6 +111,13 @@ function notify(message) {
   window.alert(message);
 }
 
+function confirmAction(message) {
+  if (typeof window.confirm === "function") {
+    return Promise.resolve(window.confirm(message));
+  }
+  return Promise.resolve(true);
+}
+
 function buildDayMap(slots) {
   return slots.reduce((acc, slot) => {
     const dayKey = toDayKey(slot.start_at);
@@ -133,14 +140,21 @@ function renderProfile() {
 
   if (activeBooking) {
     elements.statusCard.classList.remove("hidden");
-    elements.statusCard.textContent = `Вы записаны на ${formatDate(activeBooking.start_at, {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    })}.`;
+    elements.statusCard.innerHTML = `
+      <strong>У вас есть активная запись</strong>
+      <span>Вы записаны на ${formatDate(activeBooking.start_at, {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })}.</span>
+      <div class="status-card-actions">
+        <button class="danger-button" data-cancel-own-booking="true" type="button">Отменить запись</button>
+      </div>
+    `;
   } else {
     elements.statusCard.classList.add("hidden");
+    elements.statusCard.innerHTML = "";
   }
 
   if (user.is_admin) {
@@ -232,7 +246,10 @@ function renderAdminBookings() {
                   minute: "2-digit",
                 })} - ${formatDate(booking.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
               </div>
-              <span>ID: ${booking.user_telegram_id}</span>
+              <div>
+                <span>ID: ${booking.user_telegram_id}</span>
+                <button class="danger-button" data-cancel-booking="${booking.id}" type="button">Отменить</button>
+              </div>
             </div>
           `,
         )
@@ -274,6 +291,18 @@ async function refreshAll() {
 async function createBooking(slotId) {
   await apiFetch(`/api/bookings/${slotId}`, { method: "POST" });
   notify("Запись подтверждена.");
+  await refreshAll();
+}
+
+async function cancelMyBooking() {
+  await apiFetch("/api/bookings/current", { method: "DELETE" });
+  notify("Запись отменена.");
+  await refreshAll();
+}
+
+async function cancelBookingAsAdmin(bookingId) {
+  await apiFetch(`/api/admin/bookings/${bookingId}`, { method: "DELETE" });
+  notify("Запись отменена администратором.");
   await refreshAll();
 }
 
@@ -349,6 +378,32 @@ document.addEventListener("click", async (event) => {
   if (deleteButton) {
     try {
       await deleteSlot(deleteButton.dataset.deleteSlot);
+    } catch (error) {
+      notify(error.message);
+    }
+    return;
+  }
+
+  const ownCancelButton = event.target.closest("[data-cancel-own-booking]");
+  if (ownCancelButton) {
+    if (!(await confirmAction("Отменить вашу запись?"))) {
+      return;
+    }
+    try {
+      await cancelMyBooking();
+    } catch (error) {
+      notify(error.message);
+    }
+    return;
+  }
+
+  const adminCancelButton = event.target.closest("[data-cancel-booking]");
+  if (adminCancelButton) {
+    if (!(await confirmAction("Отменить запись ученика?"))) {
+      return;
+    }
+    try {
+      await cancelBookingAsAdmin(adminCancelButton.dataset.cancelBooking);
     } catch (error) {
       notify(error.message);
     }

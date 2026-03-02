@@ -190,6 +190,20 @@ h3 {
   font-weight: 700;
 }
 
+.status-card strong,
+.status-card span {
+  display: block;
+}
+
+.status-card strong {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.status-card-actions {
+  margin-top: 14px;
+}
+
 .panel {
   margin-top: 22px;
   padding: 24px;

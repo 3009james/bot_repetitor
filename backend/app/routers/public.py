@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot import notify_admin_booking, notify_student_booking
+from app.bot import (
+    notify_admin_booking,
+    notify_admin_cancellation,
+    notify_student_booking,
+    notify_student_cancellation,
+)
 from app.db import get_session
 from app.dependencies import get_current_user
 from app.models import AvailabilitySlot, Booking, TutorProfile, User
@@ -165,3 +170,44 @@ async def create_booking(
         created_at=booking.created_at,
     )
 
+
+@router.delete("/bookings/current", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_current_booking(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    booking_result = await session.execute(
+        select(Booking, AvailabilitySlot)
+        .join(AvailabilitySlot, Booking.slot_id == AvailabilitySlot.id)
+        .where(
+            Booking.user_id == current_user.id,
+            AvailabilitySlot.start_at >= datetime.now(UTC),
+        )
+        .order_by(AvailabilitySlot.start_at.asc())
+        .limit(1)
+    )
+    booking_row = booking_result.first()
+    if not booking_row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Активная запись не найдена")
+
+    booking, slot = booking_row
+    slot_start = slot.start_at.astimezone().strftime("%d.%m.%Y %H:%M")
+    slot_end = slot.end_at.astimezone().strftime("%H:%M")
+
+    await session.delete(booking)
+    await session.commit()
+
+    await notify_admin_cancellation(
+        student_name=current_user.first_name,
+        student_username=current_user.username,
+        student_telegram_id=current_user.telegram_id,
+        start_at=slot_start,
+        end_at=slot_end,
+        cancelled_by="ученик",
+    )
+    await notify_student_cancellation(
+        telegram_id=current_user.telegram_id,
+        start_at=slot_start,
+        end_at=slot_end,
+        cancelled_by="ученик",
+    )
