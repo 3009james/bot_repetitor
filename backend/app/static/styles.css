@@ -1,15 +1,15 @@
 :root {
-  color-scheme: light;
-  --bg: #f7f1e8;
-  --surface: rgba(255, 252, 247, 0.9);
-  --surface-strong: #fffaf4;
-  --text: #28180f;
-  --muted: #7a6456;
-  --line: rgba(85, 54, 35, 0.12);
-  --brand: #bf5f36;
-  --brand-dark: #8d4220;
-  --success: #256b4d;
-  --shadow: 0 30px 80px rgba(75, 45, 28, 0.12);
+  color-scheme: dark;
+  --bg: #081226;
+  --surface: rgba(13, 24, 48, 0.78);
+  --surface-strong: rgba(18, 33, 64, 0.92);
+  --text: #edf4ff;
+  --muted: #9eb0cf;
+  --line: rgba(135, 171, 233, 0.18);
+  --brand: #4f8cff;
+  --brand-dark: #2d67d8;
+  --success: #67d4a3;
+  --shadow: 0 30px 80px rgba(3, 10, 24, 0.45);
   --radius-xl: 32px;
   --radius-lg: 24px;
   --radius-md: 18px;
@@ -26,9 +26,10 @@ body {
   font-family: var(--font-main);
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(255, 208, 161, 0.8), transparent 35%),
-    radial-gradient(circle at right, rgba(222, 165, 110, 0.28), transparent 30%),
-    linear-gradient(180deg, #fbf6ef 0%, #f3e6d7 100%);
+    radial-gradient(circle at top left, rgba(84, 135, 255, 0.38), transparent 28%),
+    radial-gradient(circle at 85% 18%, rgba(0, 199, 255, 0.18), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(98, 74, 255, 0.2), transparent 30%),
+    linear-gradient(180deg, #091224 0%, #0b1730 46%, #050b17 100%);
 }
 
 img {
@@ -60,13 +61,13 @@ textarea {
 .ambient-left {
   top: -80px;
   left: -100px;
-  background: #ffd1aa;
+  background: rgba(60, 115, 255, 0.85);
 }
 
 .ambient-right {
   right: -120px;
   bottom: 10%;
-  background: #edb07f;
+  background: rgba(0, 180, 255, 0.58);
 }
 
 .container {
@@ -163,14 +164,14 @@ h3 {
 .about-text {
   font-size: 17px;
   line-height: 1.65;
-  color: #3e2a1f;
+  color: #d9e6ff;
 }
 
 .photo-frame {
   min-height: 320px;
   padding: 16px;
   border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, rgba(255, 228, 195, 0.95), rgba(249, 213, 171, 0.55));
+  background: linear-gradient(135deg, rgba(31, 60, 118, 0.95), rgba(11, 109, 169, 0.45));
 }
 
 .tutor-photo {
@@ -179,7 +180,7 @@ h3 {
   min-height: 288px;
   object-fit: cover;
   border-radius: 22px;
-  background: #efd7c3;
+  background: #13284c;
 }
 
 .status-card {
@@ -213,7 +214,8 @@ h3 {
 
 .ghost-button {
   padding: 12px 16px;
-  background: rgba(255, 244, 232, 0.95);
+  color: var(--text);
+  background: rgba(20, 38, 72, 0.96);
   border: 1px solid var(--line);
 }
 
@@ -226,8 +228,8 @@ h3 {
 
 .danger-button {
   padding: 10px 14px;
-  background: rgba(191, 95, 54, 0.14);
-  color: var(--brand-dark);
+  background: rgba(255, 99, 132, 0.14);
+  color: #ff9db2;
   font-weight: 700;
 }
 
@@ -250,17 +252,19 @@ h3 {
   border-radius: 20px;
   border: 1px solid var(--line);
   background: var(--surface-strong);
+  color: var(--text);
   cursor: pointer;
 }
 
 .day-pill.active {
-  background: #2d2017;
+  background: linear-gradient(135deg, #4f8cff, #2c6fe7);
   color: white;
 }
 
 .slot-button {
   padding: 16px 18px;
-  background: #fffaf4;
+  color: var(--text);
+  background: rgba(15, 29, 57, 0.96);
   border: 1px solid var(--line);
   text-align: left;
 }
@@ -312,15 +316,16 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px 16px;
-  background: white;
+  color: var(--text);
+  background: rgba(9, 18, 38, 0.88);
 }
 
 .file-input {
   position: relative;
   padding: 18px;
-  border: 1px dashed rgba(85, 54, 35, 0.24);
+  border: 1px dashed rgba(135, 171, 233, 0.28);
   border-radius: 18px;
-  background: #fff;
+  background: rgba(10, 20, 42, 0.88);
 }
 
 .file-input input {
@@ -341,7 +346,7 @@ textarea {
   padding: 14px 16px;
   border-radius: 18px;
   border: 1px solid var(--line);
-  background: white;
+  background: rgba(10, 20, 42, 0.88);
 }
 
 .list-item strong,
@@ -367,4 +372,3 @@ textarea {
     align-items: flex-start;
   }
 }
-
