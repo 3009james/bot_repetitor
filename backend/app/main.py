@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app.bot import bot, dp
 from app.config import get_settings
 from app.db import Base, engine
+from app.reminders import ensure_runtime_schema, reminder_worker
 from app.routers.admin import router as admin_router
 from app.routers.public import router as public_router
 
@@ -25,14 +26,19 @@ async def lifespan(_: FastAPI):
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await ensure_runtime_schema()
 
     polling_task = asyncio.create_task(dp.start_polling(bot))
+    reminder_task = asyncio.create_task(reminder_worker())
     try:
         yield
     finally:
         polling_task.cancel()
+        reminder_task.cancel()
         with suppress(asyncio.CancelledError):
             await polling_task
+        with suppress(asyncio.CancelledError):
+            await reminder_task
         await bot.session.close()
 
 

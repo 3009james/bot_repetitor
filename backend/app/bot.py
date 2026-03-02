@@ -100,3 +100,15 @@ async def notify_student_cancellation(
         await bot.send_message(telegram_id, text)
     except Exception:
         pass
+
+
+async def notify_student_reminder(
+    telegram_id: int,
+    start_at: str,
+    end_at: str,
+) -> None:
+    text = f"Напоминание: занятие начнется через 8 часов, {start_at} - {end_at}."
+    try:
+        await bot.send_message(telegram_id, text)
+    except Exception:
+        pass

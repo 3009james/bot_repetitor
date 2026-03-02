@@ -61,6 +61,7 @@ class Booking(Base):
         index=True,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="bookings")
     slot: Mapped[AvailabilitySlot] = relationship(back_populates="booking")
