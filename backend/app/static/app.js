@@ -49,10 +49,29 @@ function initTelegram() {
   tg.setBackgroundColor("#f7f1e8");
 }
 
+function getTelegramInitData() {
+  if (tg?.initData) {
+    return tg.initData;
+  }
+
+  const fromHash = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("tgWebAppData");
+  if (fromHash) {
+    return fromHash;
+  }
+
+  const fromSearch = new URLSearchParams(window.location.search).get("tgWebAppData");
+  if (fromSearch) {
+    return fromSearch;
+  }
+
+  return "";
+}
+
 async function apiFetch(path, options = {}) {
   const headers = new Headers(options.headers || {});
-  if (tg?.initData) {
-    headers.set("X-Telegram-Init-Data", tg.initData);
+  const initData = getTelegramInitData();
+  if (initData) {
+    headers.set("X-Telegram-Init-Data", initData);
   }
 
   const response = await fetch(path, {
