@@ -1,0 +1,370 @@
+:root {
+  color-scheme: light;
+  --bg: #f7f1e8;
+  --surface: rgba(255, 252, 247, 0.9);
+  --surface-strong: #fffaf4;
+  --text: #28180f;
+  --muted: #7a6456;
+  --line: rgba(85, 54, 35, 0.12);
+  --brand: #bf5f36;
+  --brand-dark: #8d4220;
+  --success: #256b4d;
+  --shadow: 0 30px 80px rgba(75, 45, 28, 0.12);
+  --radius-xl: 32px;
+  --radius-lg: 24px;
+  --radius-md: 18px;
+  --font-main: "Segoe UI", "Trebuchet MS", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-main);
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(255, 208, 161, 0.8), transparent 35%),
+    radial-gradient(circle at right, rgba(222, 165, 110, 0.28), transparent 30%),
+    linear-gradient(180deg, #fbf6ef 0%, #f3e6d7 100%);
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.app-shell {
+  position: relative;
+  overflow: hidden;
+}
+
+.ambient {
+  position: fixed;
+  z-index: 0;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.45;
+}
+
+.ambient-left {
+  top: -80px;
+  left: -100px;
+  background: #ffd1aa;
+}
+
+.ambient-right {
+  right: -120px;
+  bottom: 10%;
+  background: #edb07f;
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 28px 18px 48px;
+}
+
+.hero-card,
+.panel,
+.status-card {
+  backdrop-filter: blur(12px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow);
+}
+
+.hero-card {
+  padding: 26px;
+}
+
+.hero-header,
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 24px;
+  object-fit: cover;
+  background: #ead9c9;
+}
+
+.eyebrow,
+.section-label {
+  margin: 0 0 6px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: clamp(28px, 4vw, 42px);
+}
+
+h2 {
+  margin-bottom: 12px;
+  font-size: clamp(28px, 3.2vw, 38px);
+}
+
+h3 {
+  margin-bottom: 0;
+  font-size: 24px;
+}
+
+.role-badge {
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(191, 95, 54, 0.14);
+  color: var(--brand-dark);
+  font-weight: 700;
+}
+
+.tutor-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 0.9fr;
+  gap: 24px;
+  margin-top: 28px;
+}
+
+.about-text {
+  font-size: 17px;
+  line-height: 1.65;
+  color: #3e2a1f;
+}
+
+.photo-frame {
+  min-height: 320px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(255, 228, 195, 0.95), rgba(249, 213, 171, 0.55));
+}
+
+.tutor-photo {
+  width: 100%;
+  height: 100%;
+  min-height: 288px;
+  object-fit: cover;
+  border-radius: 22px;
+  background: #efd7c3;
+}
+
+.status-card {
+  margin-top: 22px;
+  padding: 18px 22px;
+  color: var(--success);
+  font-weight: 700;
+}
+
+.panel {
+  margin-top: 22px;
+  padding: 24px;
+}
+
+.ghost-button,
+.primary-button,
+.slot-button,
+.danger-button {
+  border: none;
+  border-radius: 18px;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.ghost-button:hover,
+.primary-button:hover,
+.slot-button:hover,
+.danger-button:hover {
+  transform: translateY(-1px);
+}
+
+.ghost-button {
+  padding: 12px 16px;
+  background: rgba(255, 244, 232, 0.95);
+  border: 1px solid var(--line);
+}
+
+.primary-button {
+  padding: 14px 18px;
+  background: var(--brand);
+  color: white;
+  font-weight: 700;
+}
+
+.danger-button {
+  padding: 10px 14px;
+  background: rgba(191, 95, 54, 0.14);
+  color: var(--brand-dark);
+  font-weight: 700;
+}
+
+.days-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 8px 0 6px;
+  margin-top: 22px;
+  scrollbar-width: none;
+}
+
+.days-row::-webkit-scrollbar {
+  display: none;
+}
+
+.day-pill {
+  min-width: 112px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  cursor: pointer;
+}
+
+.day-pill.active {
+  background: #2d2017;
+  color: white;
+}
+
+.slot-button {
+  padding: 16px 18px;
+  background: #fffaf4;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.empty-state {
+  margin-top: 22px;
+  color: var(--muted);
+}
+
+.admin-layout,
+.admin-tables {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.admin-tables {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.card-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.card-stack label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: white;
+}
+
+.file-input {
+  position: relative;
+  padding: 18px;
+  border: 1px dashed rgba(85, 54, 35, 0.24);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.file-input input {
+  padding: 0;
+  border: none;
+}
+
+.list-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: white;
+}
+
+.list-item strong,
+.list-item span {
+  display: block;
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 960px) {
+  .tutor-grid,
+  .admin-layout,
+  .admin-tables {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-header,
+  .panel-header,
+  .list-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+

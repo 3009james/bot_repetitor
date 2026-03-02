@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Запись к репетитору</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <div class="ambient ambient-left"></div>
+      <div class="ambient ambient-right"></div>
+
+      <main class="container">
+        <section class="hero-card">
+          <div class="hero-header">
+            <div class="user-badge">
+              <img id="student-avatar" class="avatar" alt="Аватар ученика" />
+              <div>
+                <p class="eyebrow">Telegram Mini App</p>
+                <h1 id="greeting-title">Здравствуйте</h1>
+              </div>
+            </div>
+            <span id="role-badge" class="role-badge hidden">Админ</span>
+          </div>
+
+          <div class="tutor-grid">
+            <div class="tutor-copy">
+              <p class="section-label">О репетиторе</p>
+              <h2 id="tutor-name">Ваш репетитор</h2>
+              <p id="about-text" class="about-text"></p>
+            </div>
+            <div class="photo-frame">
+              <img id="tutor-photo" class="tutor-photo" alt="Фото репетитора" />
+            </div>
+          </div>
+        </section>
+
+        <section id="status-card" class="status-card hidden"></section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="section-label">Онлайн-запись</p>
+              <h3>Выберите день и свободное время</h3>
+            </div>
+            <button id="refresh-button" class="ghost-button" type="button">Обновить</button>
+          </div>
+
+          <div id="days-row" class="days-row"></div>
+          <div id="slots-grid" class="slots-grid"></div>
+          <p id="empty-state" class="empty-state hidden">Свободных слотов пока нет.</p>
+        </section>
+
+        <section id="admin-panel" class="panel hidden">
+          <div class="panel-header">
+            <div>
+              <p class="section-label">Админ-панель</p>
+              <h3>Управление расписанием и профилем</h3>
+            </div>
+          </div>
+
+          <div class="admin-layout">
+            <form id="profile-form" class="card-stack">
+              <h4>Обо мне</h4>
+              <label>
+                Имя
+                <input id="profile-name" name="tutor_name" type="text" required />
+              </label>
+              <label>
+                Описание
+                <textarea id="profile-about" name="about_text" rows="6" required></textarea>
+              </label>
+              <button class="primary-button" type="submit">Сохранить текст</button>
+            </form>
+
+            <form id="photo-form" class="card-stack">
+              <h4>Фото</h4>
+              <label class="file-input">
+                <span>Загрузить фотографию</span>
+                <input id="profile-photo-file" type="file" accept="image/*" required />
+              </label>
+              <button class="primary-button" type="submit">Загрузить фото</button>
+            </form>
+
+            <form id="slot-form" class="card-stack">
+              <h4>Свободное время</h4>
+              <label>
+                Дата и время
+                <input id="slot-datetime" type="datetime-local" required />
+              </label>
+              <label>
+                Длительность, минут
+                <input id="slot-duration" type="number" min="30" max="240" step="30" value="60" required />
+              </label>
+              <button class="primary-button" type="submit">Добавить слот</button>
+            </form>
+          </div>
+
+          <div class="admin-tables">
+            <div class="card-stack">
+              <h4>Свободные слоты</h4>
+              <div id="admin-slots" class="list-stack"></div>
+            </div>
+            <div class="card-stack">
+              <h4>Записи учеников</h4>
+              <div id="admin-bookings" class="list-stack"></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js" type="module"></script>
+  </body>
+  </html>
+

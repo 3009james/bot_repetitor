@@ -1,0 +1,384 @@
+const tg = window.Telegram?.WebApp;
+
+const state = {
+  me: null,
+  slots: [],
+  adminSlots: [],
+  adminBookings: [],
+  selectedDay: null,
+};
+
+const DEFAULT_STUDENT_AVATAR =
+  "data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'%3e%3crect width='128' height='128' rx='28' fill='%23f1d4b4'/%3e%3ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='%236e4f3d' font-family='Segoe UI' font-size='34'%3eTG%3c/text%3e%3c/svg%3e";
+const DEFAULT_TUTOR_PHOTO =
+  "data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='640' height='640' viewBox='0 0 640 640'%3e%3crect width='640' height='640' rx='36' fill='%23ecd3bd'/%3e%3ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%236e4f3d' font-family='Segoe UI' font-size='44'%3e%D0%A4%D0%BE%D1%82%D0%BE%3c/text%3e%3c/svg%3e";
+
+const elements = {
+  studentAvatar: document.getElementById("student-avatar"),
+  greetingTitle: document.getElementById("greeting-title"),
+  tutorName: document.getElementById("tutor-name"),
+  aboutText: document.getElementById("about-text"),
+  tutorPhoto: document.getElementById("tutor-photo"),
+  roleBadge: document.getElementById("role-badge"),
+  statusCard: document.getElementById("status-card"),
+  daysRow: document.getElementById("days-row"),
+  slotsGrid: document.getElementById("slots-grid"),
+  emptyState: document.getElementById("empty-state"),
+  adminPanel: document.getElementById("admin-panel"),
+  profileForm: document.getElementById("profile-form"),
+  photoForm: document.getElementById("photo-form"),
+  slotForm: document.getElementById("slot-form"),
+  profileName: document.getElementById("profile-name"),
+  profileAbout: document.getElementById("profile-about"),
+  photoFile: document.getElementById("profile-photo-file"),
+  slotDatetime: document.getElementById("slot-datetime"),
+  slotDuration: document.getElementById("slot-duration"),
+  adminSlots: document.getElementById("admin-slots"),
+  adminBookings: document.getElementById("admin-bookings"),
+  refreshButton: document.getElementById("refresh-button"),
+};
+
+function initTelegram() {
+  if (!tg) {
+    return;
+  }
+
+  tg.ready();
+  tg.expand();
+  tg.setHeaderColor("#f7f1e8");
+  tg.setBackgroundColor("#f7f1e8");
+}
+
+async function apiFetch(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (tg?.initData) {
+    headers.set("X-Telegram-Init-Data", tg.initData);
+  }
+
+  const response = await fetch(path, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || "Ошибка запроса");
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  return response.json();
+}
+
+function formatDate(dateString, options = {}) {
+  return new Date(dateString).toLocaleString("ru-RU", options);
+}
+
+function toDayKey(dateString) {
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function notify(message) {
+  if (tg?.showAlert) {
+    tg.showAlert(message);
+    return;
+  }
+  window.alert(message);
+}
+
+function buildDayMap(slots) {
+  return slots.reduce((acc, slot) => {
+    const dayKey = toDayKey(slot.start_at);
+    if (!acc[dayKey]) {
+      acc[dayKey] = [];
+    }
+    acc[dayKey].push(slot);
+    return acc;
+  }, {});
+}
+
+function renderProfile() {
+  const { user, profile, active_booking: activeBooking } = state.me;
+  elements.greetingTitle.textContent = `Здравствуйте, ${user.first_name}`;
+  elements.studentAvatar.src = user.photo_url || DEFAULT_STUDENT_AVATAR;
+  elements.tutorName.textContent = profile.tutor_name;
+  elements.aboutText.textContent = profile.about_text;
+  elements.tutorPhoto.src = profile.tutor_photo_url || DEFAULT_TUTOR_PHOTO;
+  elements.roleBadge.classList.toggle("hidden", !user.is_admin);
+
+  if (activeBooking) {
+    elements.statusCard.classList.remove("hidden");
+    elements.statusCard.textContent = `Вы записаны на ${formatDate(activeBooking.start_at, {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })}.`;
+  } else {
+    elements.statusCard.classList.add("hidden");
+  }
+
+  if (user.is_admin) {
+    elements.adminPanel.classList.remove("hidden");
+    elements.profileName.value = profile.tutor_name;
+    elements.profileAbout.value = profile.about_text;
+  }
+}
+
+function renderSlots() {
+  const dayMap = buildDayMap(state.slots);
+  const dayKeys = Object.keys(dayMap);
+
+  if (!dayKeys.length) {
+    elements.daysRow.innerHTML = "";
+    elements.slotsGrid.innerHTML = "";
+    elements.emptyState.classList.remove("hidden");
+    elements.emptyState.textContent = state.me?.active_booking
+      ? "У вас уже есть активная запись. Свободные слоты снова появятся после нее."
+      : "Свободных слотов пока нет.";
+    return;
+  }
+
+  elements.emptyState.classList.add("hidden");
+  state.selectedDay = dayKeys.includes(state.selectedDay) ? state.selectedDay : dayKeys[0];
+
+  elements.daysRow.innerHTML = dayKeys
+    .map((dayKey) => {
+      const date = new Date(dayKey);
+      const label = date.toLocaleDateString("ru-RU", {
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit",
+      });
+      const isActive = state.selectedDay === dayKey ? "active" : "";
+      return `<button class="day-pill ${isActive}" data-day="${dayKey}" type="button">${label}</button>`;
+    })
+    .join("");
+
+  elements.slotsGrid.innerHTML = dayMap[state.selectedDay]
+    .map((slot) => {
+      const start = formatDate(slot.start_at, { hour: "2-digit", minute: "2-digit" });
+      const end = formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" });
+      return `
+        <button class="slot-button" data-slot-id="${slot.id}" type="button">
+          <strong>${start} - ${end}</strong>
+          <span>Записаться</span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function renderAdminSlots() {
+  elements.adminSlots.innerHTML = state.adminSlots.length
+    ? state.adminSlots
+        .map(
+          (slot) => `
+            <div class="list-item">
+              <div>
+                <strong>${formatDate(slot.start_at, {
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}</strong>
+                <span>${formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
+              </div>
+              <button class="danger-button" data-delete-slot="${slot.id}" type="button">Удалить</button>
+            </div>
+          `,
+        )
+        .join("")
+    : `<p>Свободных слотов пока нет.</p>`;
+}
+
+function renderAdminBookings() {
+  elements.adminBookings.innerHTML = state.adminBookings.length
+    ? state.adminBookings
+        .map(
+          (booking) => `
+            <div class="list-item">
+              <div>
+                <strong>${booking.user_first_name}${booking.username ? ` (@${booking.username})` : ""}</strong>
+                <span>${formatDate(booking.start_at, {
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })} - ${formatDate(booking.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
+              </div>
+              <span>ID: ${booking.user_telegram_id}</span>
+            </div>
+          `,
+        )
+        .join("")
+    : `<p>Записей пока нет.</p>`;
+}
+
+async function loadMe() {
+  state.me = await apiFetch("/api/me");
+  renderProfile();
+}
+
+async function loadSlots() {
+  state.slots = await apiFetch("/api/slots");
+  renderSlots();
+}
+
+async function loadAdminData() {
+  if (!state.me?.user?.is_admin) {
+    return;
+  }
+
+  const [slots, bookings] = await Promise.all([
+    apiFetch("/api/admin/slots"),
+    apiFetch("/api/admin/bookings"),
+  ]);
+  state.adminSlots = slots;
+  state.adminBookings = bookings;
+  renderAdminSlots();
+  renderAdminBookings();
+}
+
+async function refreshAll() {
+  await loadMe();
+  await loadSlots();
+  await loadAdminData();
+}
+
+async function createBooking(slotId) {
+  await apiFetch(`/api/bookings/${slotId}`, { method: "POST" });
+  notify("Запись подтверждена.");
+  await refreshAll();
+}
+
+async function saveProfile(event) {
+  event.preventDefault();
+  await apiFetch("/api/admin/profile", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tutor_name: elements.profileName.value.trim(),
+      about_text: elements.profileAbout.value.trim(),
+    }),
+  });
+  await refreshAll();
+}
+
+async function uploadPhoto(event) {
+  event.preventDefault();
+  const file = elements.photoFile.files[0];
+  if (!file) {
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("photo", file);
+  await apiFetch("/api/admin/profile/photo", {
+    method: "POST",
+    body: formData,
+  });
+  elements.photoForm.reset();
+  await refreshAll();
+}
+
+async function createSlot(event) {
+  event.preventDefault();
+  await apiFetch("/api/admin/slots", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      start_at: new Date(elements.slotDatetime.value).toISOString(),
+      duration_minutes: Number(elements.slotDuration.value),
+    }),
+  });
+  elements.slotForm.reset();
+  elements.slotDuration.value = "60";
+  await refreshAll();
+}
+
+async function deleteSlot(slotId) {
+  await apiFetch(`/api/admin/slots/${slotId}`, { method: "DELETE" });
+  await refreshAll();
+}
+
+document.addEventListener("click", async (event) => {
+  const dayButton = event.target.closest("[data-day]");
+  if (dayButton) {
+    state.selectedDay = dayButton.dataset.day;
+    renderSlots();
+    return;
+  }
+
+  const slotButton = event.target.closest("[data-slot-id]");
+  if (slotButton) {
+    try {
+      await createBooking(slotButton.dataset.slotId);
+    } catch (error) {
+      notify(error.message);
+    }
+    return;
+  }
+
+  const deleteButton = event.target.closest("[data-delete-slot]");
+  if (deleteButton) {
+    try {
+      await deleteSlot(deleteButton.dataset.deleteSlot);
+    } catch (error) {
+      notify(error.message);
+    }
+  }
+});
+
+elements.profileForm.addEventListener("submit", async (event) => {
+  try {
+    await saveProfile(event);
+  } catch (error) {
+    notify(error.message);
+  }
+});
+
+elements.photoForm.addEventListener("submit", async (event) => {
+  try {
+    await uploadPhoto(event);
+  } catch (error) {
+    notify(error.message);
+  }
+});
+
+elements.slotForm.addEventListener("submit", async (event) => {
+  try {
+    await createSlot(event);
+  } catch (error) {
+    notify(error.message);
+  }
+});
+
+elements.refreshButton.addEventListener("click", async () => {
+  try {
+    await refreshAll();
+  } catch (error) {
+    notify(error.message);
+  }
+});
+
+async function bootstrap() {
+  initTelegram();
+  try {
+    await refreshAll();
+  } catch (error) {
+    console.error(error);
+    const message = error.message || "Не удалось загрузить приложение";
+    notify(message);
+    elements.emptyState.classList.remove("hidden");
+    elements.emptyState.textContent = message;
+  }
+}
+
+bootstrap();
