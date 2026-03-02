@@ -112,6 +112,12 @@ function notify(message) {
 }
 
 function confirmAction(message) {
+  if (tg?.showConfirm) {
+    return new Promise((resolve) => {
+      tg.showConfirm(message, (confirmed) => resolve(Boolean(confirmed)));
+    });
+  }
+
   if (typeof window.confirm === "function") {
     return Promise.resolve(window.confirm(message));
   }
