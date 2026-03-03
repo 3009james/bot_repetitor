@@ -29,6 +29,8 @@ const elements = {
   inviteFriendButton: document.getElementById("invite-friend-button"),
   statusCard: document.getElementById("status-card"),
   daysRow: document.getElementById("days-row"),
+  daysScrollLeft: document.getElementById("days-scroll-left"),
+  daysScrollRight: document.getElementById("days-scroll-right"),
   slotsGrid: document.getElementById("slots-grid"),
   emptyState: document.getElementById("empty-state"),
   adminPanel: document.getElementById("admin-panel"),
@@ -194,6 +196,17 @@ function setupDaysDesktopScroll() {
 
   window.addEventListener("mouseup", stopDragging);
   row.addEventListener("mouseleave", stopDragging);
+}
+
+function scrollDays(direction) {
+  const row = elements.daysRow;
+  if (!row) {
+    return;
+  }
+  row.scrollBy({
+    left: direction * 220,
+    behavior: "smooth",
+  });
 }
 
 function normalizeMeResponse(payload) {
@@ -619,6 +632,9 @@ elements.refreshButton?.addEventListener("click", async () => {
     notify(error.message);
   }
 });
+
+elements.daysScrollLeft?.addEventListener("click", () => scrollDays(-1));
+elements.daysScrollRight?.addEventListener("click", () => scrollDays(1));
 
 elements.inviteFriendButton?.addEventListener("click", async () => {
   try {

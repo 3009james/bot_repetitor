@@ -299,13 +299,31 @@ h3 {
   font-weight: 700;
 }
 
+.days-nav {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.days-arrow {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 16px;
+  font-size: 22px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
 .days-row {
   display: flex;
   gap: 12px;
   overflow-x: auto;
   overflow-y: hidden;
   padding: 8px 0 6px;
-  margin-top: 22px;
+  margin-top: 0;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x proximity;
@@ -449,5 +467,13 @@ textarea {
   .list-item {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .days-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .days-arrow {
+    display: none;
   }
 }
