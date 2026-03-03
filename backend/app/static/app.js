@@ -24,6 +24,7 @@ const elements = {
   tutorName: document.getElementById("tutor-name"),
   aboutText: document.getElementById("about-text"),
   tutorPhoto: document.getElementById("tutor-photo"),
+  openPortfolioButton: document.getElementById("open-portfolio-button"),
   roleBadge: document.getElementById("role-badge"),
   promoStatus: document.getElementById("promo-status"),
   inviteFriendButton: document.getElementById("invite-friend-button"),
@@ -37,11 +38,24 @@ const elements = {
   profileForm: document.getElementById("profile-form"),
   photoForm: document.getElementById("photo-form"),
   slotForm: document.getElementById("slot-form"),
+  portfolioForm: document.getElementById("portfolio-form"),
+  portfolioArticlesPhotoForm: document.getElementById("portfolio-articles-photo-form"),
+  portfolioProgramsPhotoForm: document.getElementById("portfolio-programs-photo-form"),
+  portfolioEventsPhotoForm: document.getElementById("portfolio-events-photo-form"),
   profileName: document.getElementById("profile-name"),
   profileAbout: document.getElementById("profile-about"),
   photoFile: document.getElementById("profile-photo-file"),
   slotDatetime: document.getElementById("slot-datetime"),
   slotDuration: document.getElementById("slot-duration"),
+  portfolioArticlesText: document.getElementById("portfolio-articles-text"),
+  portfolioProgramsText: document.getElementById("portfolio-programs-text"),
+  portfolioEventsText: document.getElementById("portfolio-events-text"),
+  portfolioArticlesPhotoFile: document.getElementById("portfolio-articles-photo-file"),
+  portfolioProgramsPhotoFile: document.getElementById("portfolio-programs-photo-file"),
+  portfolioEventsPhotoFile: document.getElementById("portfolio-events-photo-file"),
+  portfolioModal: document.getElementById("portfolio-modal"),
+  closePortfolioButton: document.getElementById("close-portfolio-button"),
+  portfolioList: document.getElementById("portfolio-list"),
   adminSlots: document.getElementById("admin-slots"),
   adminBookings: document.getElementById("admin-bookings"),
   refreshButton: document.getElementById("refresh-button"),
@@ -83,20 +97,14 @@ async function apiFetch(path, options = {}) {
     headers.set("X-Telegram-Init-Data", initData);
   }
 
-  const response = await fetch(path, {
-    ...options,
-    headers,
-  });
-
+  const response = await fetch(path, { ...options, headers });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     throw new Error(payload.detail || "Ошибка запроса");
   }
-
   if (response.status === 204) {
     return null;
   }
-
   return response.json();
 }
 
@@ -131,16 +139,37 @@ function notify(message) {
 
 function confirmAction(message) {
   if (tg?.showConfirm) {
-    return new Promise((resolve) => {
-      tg.showConfirm(message, (confirmed) => resolve(Boolean(confirmed)));
-    });
+    return new Promise((resolve) => tg.showConfirm(message, (confirmed) => resolve(Boolean(confirmed))));
   }
+  return Promise.resolve(window.confirm(message));
+}
 
-  if (typeof window.confirm === "function") {
-    return Promise.resolve(window.confirm(message));
-  }
-
-  return Promise.resolve(true);
+function normalizeMeResponse(payload) {
+  return {
+    user: payload?.user || {
+      telegram_id: 0,
+      first_name: "Ученик",
+      username: null,
+      photo_url: null,
+      is_admin: false,
+    },
+    profile: payload?.profile || {
+      tutor_name: "Ваш репетитор",
+      about_text: "",
+      tutor_photo_url: null,
+      portfolio_sections: [],
+    },
+    upcoming_bookings: Array.isArray(payload?.upcoming_bookings) ? payload.upcoming_bookings : [],
+    referral: payload?.referral || {
+      referral_link: null,
+      link_copied: false,
+      friend_discount_percent: 20,
+      owner_discount_percent: 50,
+      current_slot_discount_percent: 0,
+      reward_count: 0,
+      referred_discount_available: false,
+    },
+  };
 }
 
 function buildDayMap(slots) {
@@ -165,9 +194,6 @@ function setupDaysDesktopScroll() {
   row.addEventListener(
     "wheel",
     (event) => {
-      if (Math.abs(event.deltaY) < Math.abs(event.deltaX) && event.deltaX === 0) {
-        return;
-      }
       row.scrollLeft += event.deltaY || event.deltaX;
       event.preventDefault();
     },
@@ -175,6 +201,9 @@ function setupDaysDesktopScroll() {
   );
 
   row.addEventListener("mousedown", (event) => {
+    if (event.target.closest(".day-pill")) {
+      return;
+    }
     state.daysDrag.active = true;
     state.daysDrag.startX = event.clientX;
     state.daysDrag.startScrollLeft = row.scrollLeft;
@@ -185,8 +214,7 @@ function setupDaysDesktopScroll() {
     if (!state.daysDrag.active) {
       return;
     }
-    const deltaX = event.clientX - state.daysDrag.startX;
-    row.scrollLeft = state.daysDrag.startScrollLeft - deltaX;
+    row.scrollLeft = state.daysDrag.startScrollLeft - (event.clientX - state.daysDrag.startX);
   });
 
   const stopDragging = () => {
@@ -199,41 +227,41 @@ function setupDaysDesktopScroll() {
 }
 
 function scrollDays(direction) {
-  const row = elements.daysRow;
-  if (!row) {
-    return;
-  }
-  row.scrollBy({
-    left: direction * 220,
-    behavior: "smooth",
-  });
+  elements.daysRow?.scrollBy({ left: direction * 220, behavior: "smooth" });
 }
 
-function normalizeMeResponse(payload) {
-  return {
-    user: payload?.user || {
-      telegram_id: 0,
-      first_name: "Ученик",
-      username: null,
-      photo_url: null,
-      is_admin: false,
-    },
-    profile: payload?.profile || {
-      tutor_name: "Ваш репетитор",
-      about_text: "",
-      tutor_photo_url: null,
-    },
-    upcoming_bookings: Array.isArray(payload?.upcoming_bookings) ? payload.upcoming_bookings : [],
-    referral: payload?.referral || {
-      referral_link: null,
-      link_copied: false,
-      friend_discount_percent: 20,
-      owner_discount_percent: 50,
-      current_slot_discount_percent: 0,
-      reward_count: 0,
-      referred_discount_available: false,
-    },
-  };
+function getPortfolioSection(index) {
+  return state.me?.profile?.portfolio_sections?.[index] || { title: "", text: "", photo_url: null };
+}
+
+function renderPortfolioModal() {
+  if (!elements.portfolioList) {
+    return;
+  }
+  const sections = state.me?.profile?.portfolio_sections || [];
+  elements.portfolioList.innerHTML = sections
+    .map(
+      (section) => `
+        <article class="portfolio-item">
+          <h4>${escapeHtml(section.title)}</h4>
+          <p>${escapeHtml(section.text)}</p>
+          <img class="portfolio-photo" src="${section.photo_url || DEFAULT_TUTOR_PHOTO}" alt="${escapeHtml(section.title)}" />
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function openPortfolioModal() {
+  if (!elements.portfolioModal) {
+    return;
+  }
+  renderPortfolioModal();
+  elements.portfolioModal?.classList.remove("hidden");
+}
+
+function closePortfolioModal() {
+  elements.portfolioModal?.classList.add("hidden");
 }
 
 function renderPromo() {
@@ -243,27 +271,24 @@ function renderPromo() {
 
   const referral = state.me.referral;
   const statuses = [];
-
   if (referral.current_slot_discount_percent === 50) {
     statuses.push("У вас активна скидка 50% на следующую запись.");
   } else if (referral.current_slot_discount_percent === 20) {
     statuses.push("Для вас активна скидка 20% на первую запись по приглашению.");
   }
-
   if (referral.reward_count > 0) {
     statuses.push(`Доступно бонусов 50%: ${referral.reward_count}.`);
   }
-
   if (referral.link_copied) {
     statuses.push("Реферальная ссылка уже копировалась.");
   }
-
   elements.promoStatus.textContent =
     statuses.join(" ") || "Скопируйте ссылку и отправьте ее другу прямо из Telegram.";
 }
 
 function renderProfile() {
   const { user, profile, upcoming_bookings: upcomingBookings } = state.me;
+
   elements.greetingTitle.textContent = `Здравствуйте, ${user.first_name}`;
   elements.studentAvatar.src = user.photo_url || DEFAULT_STUDENT_AVATAR;
   elements.tutorName.textContent = profile.tutor_name;
@@ -289,11 +314,7 @@ function renderProfile() {
                   minute: "2-digit",
                 })}</strong>
                 <span>До ${formatDate(booking.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
-                ${
-                  booking.discount_label
-                    ? `<span class="discount-meta">${escapeHtml(booking.discount_label)}</span>`
-                    : ""
-                }
+                ${booking.discount_label ? `<span class="discount-meta">${escapeHtml(booking.discount_label)}</span>` : ""}
               </div>
               <button class="danger-button" data-cancel-own-booking="${booking.id}" type="button">Отменить</button>
             </div>
@@ -308,14 +329,26 @@ function renderProfile() {
 
   if (user.is_admin) {
     elements.adminPanel.classList.remove("hidden");
-    elements.profileName.value = profile.tutor_name;
-    elements.profileAbout.value = profile.about_text;
+    if (elements.profileName) {
+      elements.profileName.value = profile.tutor_name;
+    }
+    if (elements.profileAbout) {
+      elements.profileAbout.value = profile.about_text;
+    }
+    if (elements.portfolioArticlesText) {
+      elements.portfolioArticlesText.value = getPortfolioSection(0).text || "";
+    }
+    if (elements.portfolioProgramsText) {
+      elements.portfolioProgramsText.value = getPortfolioSection(1).text || "";
+    }
+    if (elements.portfolioEventsText) {
+      elements.portfolioEventsText.value = getPortfolioSection(2).text || "";
+    }
   }
 }
 
 function renderSlots() {
   setupDaysDesktopScroll();
-
   const dayMap = buildDayMap(state.slots);
   const dayKeys = Object.keys(dayMap);
 
@@ -333,11 +366,7 @@ function renderSlots() {
   elements.daysRow.innerHTML = dayKeys
     .map((dayKey) => {
       const date = new Date(dayKey);
-      const label = date.toLocaleDateString("ru-RU", {
-        weekday: "short",
-        day: "2-digit",
-        month: "2-digit",
-      });
+      const label = date.toLocaleDateString("ru-RU", { weekday: "short", day: "2-digit", month: "2-digit" });
       const isActive = state.selectedDay === dayKey ? "active" : "";
       return `<button class="day-pill ${isActive}" data-day="${dayKey}" type="button">${label}</button>`;
     })
@@ -347,15 +376,11 @@ function renderSlots() {
     .map((slot) => {
       const start = formatDate(slot.start_at, { hour: "2-digit", minute: "2-digit" });
       const end = formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" });
-      const discountBadge =
-        slot.discount_percent > 0
-          ? `<span class="slot-discount-badge">Скидка ${slot.discount_percent}%</span>`
-          : "";
       return `
         <button class="slot-button" data-slot-id="${slot.id}" type="button">
           <strong>${start} - ${end}</strong>
           <span>Записаться</span>
-          ${discountBadge}
+          ${slot.discount_percent > 0 ? `<span class="slot-discount-badge">Скидка ${slot.discount_percent}%</span>` : ""}
         </button>
       `;
     })
@@ -388,31 +413,26 @@ function renderAdminSlots() {
 function renderAdminBookings() {
   elements.adminBookings.innerHTML = state.adminBookings.length
     ? state.adminBookings
-        .map((booking) => {
-          const username = booking.username ? ` (@${escapeHtml(booking.username)})` : "";
-          const discountMeta =
-            booking.discount_percent > 0
-              ? `<span class="discount-meta">Скидка ${booking.discount_percent}%</span>`
-              : "";
-          return `
+        .map(
+          (booking) => `
             <div class="list-item">
               <div>
-                <strong>${escapeHtml(booking.user_first_name)}${username}</strong>
+                <strong>${escapeHtml(booking.user_first_name)}${booking.username ? ` (@${escapeHtml(booking.username)})` : ""}</strong>
                 <span>${formatDate(booking.start_at, {
                   day: "2-digit",
                   month: "2-digit",
                   hour: "2-digit",
                   minute: "2-digit",
                 })} - ${formatDate(booking.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
-                ${discountMeta}
+                ${booking.discount_percent > 0 ? `<span class="discount-meta">Скидка ${booking.discount_percent}%</span>` : ""}
               </div>
               <div>
                 <span>ID: ${booking.user_telegram_id}</span>
                 <button class="danger-button" data-cancel-booking="${booking.id}" type="button">Отменить</button>
               </div>
             </div>
-          `;
-        })
+          `,
+        )
         .join("")
     : "<p>Записей пока нет.</p>";
 }
@@ -431,11 +451,7 @@ async function loadAdminData() {
   if (!state.me?.user?.is_admin) {
     return;
   }
-
-  const [slots, bookings] = await Promise.all([
-    apiFetch("/api/admin/slots"),
-    apiFetch("/api/admin/bookings"),
-  ]);
+  const [slots, bookings] = await Promise.all([apiFetch("/api/admin/slots"), apiFetch("/api/admin/bookings")]);
   state.adminSlots = slots;
   state.adminBookings = bookings;
   renderAdminSlots();
@@ -472,8 +488,11 @@ async function saveProfile(event) {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      tutor_name: elements.profileName.value.trim(),
-      about_text: elements.profileAbout.value.trim(),
+      tutor_name: elements.profileName?.value.trim() || state.me.profile.tutor_name,
+      about_text: elements.profileAbout?.value.trim() || state.me.profile.about_text,
+      portfolio_articles_text: elements.portfolioArticlesText?.value.trim() || getPortfolioSection(0).text,
+      portfolio_programs_text: elements.portfolioProgramsText?.value.trim() || getPortfolioSection(1).text,
+      portfolio_events_text: elements.portfolioEventsText?.value.trim() || getPortfolioSection(2).text,
     }),
   });
   await refreshAll();
@@ -485,14 +504,22 @@ async function uploadPhoto(event) {
   if (!file) {
     return;
   }
-
   const formData = new FormData();
   formData.append("photo", file);
-  await apiFetch("/api/admin/profile/photo", {
-    method: "POST",
-    body: formData,
-  });
+  await apiFetch("/api/admin/profile/photo", { method: "POST", body: formData });
   elements.photoForm.reset();
+  await refreshAll();
+}
+
+async function uploadPortfolioPhoto(section, fileInput, formElement) {
+  const file = fileInput.files[0];
+  if (!file) {
+    return;
+  }
+  const formData = new FormData();
+  formData.append("photo", file);
+  await apiFetch(`/api/admin/profile/portfolio-photo/${section}`, { method: "POST", body: formData });
+  formElement.reset();
   await refreshAll();
 }
 
@@ -520,18 +547,15 @@ async function inviteFriend() {
   const referral = await apiFetch("/api/referrals/copy", { method: "POST" });
   state.me.referral = referral;
   renderPromo();
-
   if (!referral.referral_link) {
     notify("Ссылка на бота пока недоступна.");
     return;
   }
-
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(referral.referral_link);
     notify("Ссылка приглашения скопирована.");
     return;
   }
-
   notify(`Скопируйте ссылку вручную: ${referral.referral_link}`);
 }
 
@@ -543,16 +567,17 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  const closePortfolio = event.target.closest("[data-close-portfolio]");
+  if (closePortfolio) {
+    closePortfolioModal();
+    return;
+  }
+
   const slotButton = event.target.closest("[data-slot-id]");
   if (slotButton) {
     const slot = state.slots.find((item) => String(item.id) === String(slotButton.dataset.slotId));
     const slotLabel = slot
-      ? `${formatDate(slot.start_at, {
-          day: "2-digit",
-          month: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        })} - ${formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" })}`
+      ? `${formatDate(slot.start_at, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} - ${formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" })}`
       : "выбранное время";
     if (!(await confirmAction(`Подтвердите запись на ${slotLabel}?`))) {
       return;
@@ -609,6 +634,14 @@ elements.profileForm?.addEventListener("submit", async (event) => {
   }
 });
 
+elements.portfolioForm?.addEventListener("submit", async (event) => {
+  try {
+    await saveProfile(event);
+  } catch (error) {
+    notify(error.message);
+  }
+});
+
 elements.photoForm?.addEventListener("submit", async (event) => {
   try {
     await uploadPhoto(event);
@@ -625,6 +658,33 @@ elements.slotForm?.addEventListener("submit", async (event) => {
   }
 });
 
+elements.portfolioArticlesPhotoForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await uploadPortfolioPhoto("articles", elements.portfolioArticlesPhotoFile, elements.portfolioArticlesPhotoForm);
+  } catch (error) {
+    notify(error.message);
+  }
+});
+
+elements.portfolioProgramsPhotoForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await uploadPortfolioPhoto("programs", elements.portfolioProgramsPhotoFile, elements.portfolioProgramsPhotoForm);
+  } catch (error) {
+    notify(error.message);
+  }
+});
+
+elements.portfolioEventsPhotoForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await uploadPortfolioPhoto("events", elements.portfolioEventsPhotoFile, elements.portfolioEventsPhotoForm);
+  } catch (error) {
+    notify(error.message);
+  }
+});
+
 elements.refreshButton?.addEventListener("click", async () => {
   try {
     await refreshAll();
@@ -635,12 +695,19 @@ elements.refreshButton?.addEventListener("click", async () => {
 
 elements.daysScrollLeft?.addEventListener("click", () => scrollDays(-1));
 elements.daysScrollRight?.addEventListener("click", () => scrollDays(1));
-
 elements.inviteFriendButton?.addEventListener("click", async () => {
   try {
     await inviteFriend();
   } catch (error) {
     notify(error.message);
+  }
+});
+elements.openPortfolioButton?.addEventListener("click", openPortfolioModal);
+elements.closePortfolioButton?.addEventListener("click", closePortfolioModal);
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closePortfolioModal();
   }
 });
 

@@ -6,16 +6,22 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot import notify_admin_cancellation, notify_student_cancellation
 from app.config import get_settings
 from app.db import get_session
 from app.dependencies import require_admin
-from app.bot import notify_admin_cancellation, notify_student_cancellation
 from app.models import AvailabilitySlot, Booking, User
 from app.referrals import rollback_referral_on_cancellation
-from app.routers.public import get_or_create_profile
+from app.routers.public import build_profile_payload, get_or_create_profile
 from app.schemas import BookingListItem, ProfileUpdate, SlotCreate, SlotOut, TutorProfileOut
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+PORTFOLIO_SECTION_FIELDS = {
+    "articles": "portfolio_articles_photo_path",
+    "programs": "portfolio_programs_photo_path",
+    "events": "portfolio_events_photo_path",
+}
 
 
 def ensure_upload_dir() -> Path:
@@ -30,11 +36,7 @@ async def get_profile(
     _: User = Depends(require_admin),
 ) -> TutorProfileOut:
     profile = await get_or_create_profile(session)
-    return TutorProfileOut(
-        tutor_name=profile.tutor_name,
-        about_text=profile.about_text,
-        tutor_photo_url=profile.tutor_photo_path,
-    )
+    return build_profile_payload(profile)
 
 
 @router.patch("/profile", response_model=TutorProfileOut)
@@ -46,13 +48,12 @@ async def update_profile(
     profile = await get_or_create_profile(session)
     profile.tutor_name = payload.tutor_name
     profile.about_text = payload.about_text
+    profile.portfolio_articles_text = payload.portfolio_articles_text
+    profile.portfolio_programs_text = payload.portfolio_programs_text
+    profile.portfolio_events_text = payload.portfolio_events_text
     await session.commit()
     await session.refresh(profile)
-    return TutorProfileOut(
-        tutor_name=profile.tutor_name,
-        about_text=profile.about_text,
-        tutor_photo_url=profile.tutor_photo_path,
-    )
+    return build_profile_payload(profile)
 
 
 @router.post("/profile/photo", response_model=TutorProfileOut)
@@ -72,11 +73,31 @@ async def upload_profile_photo(
     await session.commit()
     await session.refresh(profile)
 
-    return TutorProfileOut(
-        tutor_name=profile.tutor_name,
-        about_text=profile.about_text,
-        tutor_photo_url=profile.tutor_photo_path,
-    )
+    return build_profile_payload(profile)
+
+
+@router.post("/profile/portfolio-photo/{section}", response_model=TutorProfileOut)
+async def upload_portfolio_photo(
+    section: str,
+    photo: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> TutorProfileOut:
+    profile = await get_or_create_profile(session)
+    target_field = PORTFOLIO_SECTION_FIELDS.get(section)
+    if target_field is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Раздел портфолио не найден")
+
+    upload_dir = ensure_upload_dir()
+    extension = Path(photo.filename or "photo.jpg").suffix or ".jpg"
+    filename = f"{uuid4().hex}{extension}"
+    file_path = upload_dir / filename
+    file_path.write_bytes(await photo.read())
+
+    setattr(profile, target_field, f"/uploads/{filename}")
+    await session.commit()
+    await session.refresh(profile)
+    return build_profile_payload(profile)
 
 
 @router.post("/slots", response_model=SlotOut)

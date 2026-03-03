@@ -48,6 +48,57 @@ async def ensure_runtime_schema() -> None:
         await session.execute(
             text(
                 """
+                ALTER TABLE tutor_profile
+                ADD COLUMN IF NOT EXISTS portfolio_articles_text TEXT NOT NULL
+                DEFAULT 'Автор: более 10 научных статей в области машинного обучения и нейронных сетей.'
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE tutor_profile
+                ADD COLUMN IF NOT EXISTS portfolio_articles_photo_path VARCHAR(1024) NULL
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE tutor_profile
+                ADD COLUMN IF NOT EXISTS portfolio_programs_text TEXT NOT NULL
+                DEFAULT 'Более 5 государственных регистраций программ ЭВМ.'
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE tutor_profile
+                ADD COLUMN IF NOT EXISTS portfolio_programs_photo_path VARCHAR(1024) NULL
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE tutor_profile
+                ADD COLUMN IF NOT EXISTS portfolio_events_text TEXT NOT NULL
+                DEFAULT 'Участник конференций и хакатонов, в том числе международных.'
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE tutor_profile
+                ADD COLUMN IF NOT EXISTS portfolio_events_photo_path VARCHAR(1024) NULL
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
                 ALTER TABLE bookings
                 ADD COLUMN IF NOT EXISTS discount_percent INTEGER NOT NULL DEFAULT 0
                 """

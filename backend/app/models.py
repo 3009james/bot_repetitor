@@ -39,6 +39,21 @@ class TutorProfile(Base):
     tutor_name: Mapped[str] = mapped_column(String(255), default="Ваш репетитор")
     about_text: Mapped[str] = mapped_column(Text, default="Добавьте информацию о себе в админ-панели.")
     tutor_photo_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    portfolio_articles_text: Mapped[str] = mapped_column(
+        Text,
+        default="Автор: более 10 научных статей в области машинного обучения и нейронных сетей.",
+    )
+    portfolio_articles_photo_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    portfolio_programs_text: Mapped[str] = mapped_column(
+        Text,
+        default="Более 5 государственных регистраций программ ЭВМ.",
+    )
+    portfolio_programs_photo_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    portfolio_events_text: Mapped[str] = mapped_column(
+        Text,
+        default="Участник конференций и хакатонов, в том числе международных.",
+    )
+    portfolio_events_photo_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

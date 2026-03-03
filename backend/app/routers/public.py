@@ -23,7 +23,15 @@ from app.referrals import (
     rollback_referral_on_cancellation,
     touch_referral_copy,
 )
-from app.schemas import BookingInfo, MeResponse, ReferralInfoOut, SlotOut, TutorProfileOut, UserSummary
+from app.schemas import (
+    BookingInfo,
+    MeResponse,
+    PortfolioSectionOut,
+    ReferralInfoOut,
+    SlotOut,
+    TutorProfileOut,
+    UserSummary,
+)
 
 router = APIRouter(prefix="/api", tags=["public"])
 
@@ -36,6 +44,31 @@ async def get_or_create_profile(session: AsyncSession) -> TutorProfile:
         await session.commit()
         await session.refresh(profile)
     return profile
+
+
+def build_profile_payload(profile: TutorProfile) -> TutorProfileOut:
+    return TutorProfileOut(
+        tutor_name=profile.tutor_name,
+        about_text=profile.about_text,
+        tutor_photo_url=profile.tutor_photo_path,
+        portfolio_sections=[
+            PortfolioSectionOut(
+                title="Автор научных статей",
+                text=profile.portfolio_articles_text,
+                photo_url=profile.portfolio_articles_photo_path,
+            ),
+            PortfolioSectionOut(
+                title="Государственные регистрации программ ЭВМ",
+                text=profile.portfolio_programs_text,
+                photo_url=profile.portfolio_programs_photo_path,
+            ),
+            PortfolioSectionOut(
+                title="Конференции и хакатоны",
+                text=profile.portfolio_events_text,
+                photo_url=profile.portfolio_events_photo_path,
+            ),
+        ],
+    )
 
 
 def build_referral_link(user: User) -> str | None:
@@ -96,11 +129,7 @@ async def read_me(
             photo_url=current_user.photo_url,
             is_admin=current_user.is_admin,
         ),
-        profile=TutorProfileOut(
-            tutor_name=profile.tutor_name,
-            about_text=profile.about_text,
-            tutor_photo_url=profile.tutor_photo_path,
-        ),
+        profile=build_profile_payload(profile),
         upcoming_bookings=upcoming_bookings,
         referral=await build_referral_info(session, current_user),
     )

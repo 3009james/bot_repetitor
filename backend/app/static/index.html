@@ -33,6 +33,7 @@
             </div>
             <div class="photo-frame">
               <img id="tutor-photo" class="tutor-photo" alt="Фото репетитора" />
+              <button id="open-portfolio-button" class="primary-button photo-action" type="button">Портфолио</button>
             </div>
           </div>
         </section>
@@ -68,9 +69,9 @@
           </div>
 
           <div class="days-nav">
-            <button id="days-scroll-left" class="ghost-button days-arrow" type="button">←</button>
+            <button id="days-scroll-left" class="ghost-button days-arrow" type="button">&larr;</button>
             <div id="days-row" class="days-row"></div>
-            <button id="days-scroll-right" class="ghost-button days-arrow" type="button">→</button>
+            <button id="days-scroll-right" class="ghost-button days-arrow" type="button">&rarr;</button>
           </div>
           <div id="slots-grid" class="slots-grid"></div>
           <p id="empty-state" class="empty-state hidden">Свободных слотов пока нет.</p>
@@ -99,7 +100,7 @@
             </form>
 
             <form id="photo-form" class="card-stack">
-              <h4>Фото</h4>
+              <h4>Главное фото</h4>
               <label class="file-input">
                 <span>Загрузить фотографию</span>
                 <input id="profile-photo-file" type="file" accept="image/*" required />
@@ -121,6 +122,43 @@
             </form>
           </div>
 
+          <div class="admin-portfolio">
+            <form id="portfolio-form" class="card-stack">
+              <h4>Портфолио</h4>
+              <label>
+                Научные статьи
+                <textarea id="portfolio-articles-text" rows="4" required></textarea>
+              </label>
+              <label>
+                Регистрации программ ЭВМ
+                <textarea id="portfolio-programs-text" rows="4" required></textarea>
+              </label>
+              <label>
+                Конференции и хакатоны
+                <textarea id="portfolio-events-text" rows="4" required></textarea>
+              </label>
+              <button class="primary-button" type="submit">Сохранить портфолио</button>
+            </form>
+
+            <form id="portfolio-articles-photo-form" class="card-stack">
+              <h4>Фото для статей</h4>
+              <input id="portfolio-articles-photo-file" type="file" accept="image/*" required />
+              <button class="primary-button" type="submit">Загрузить фото</button>
+            </form>
+
+            <form id="portfolio-programs-photo-form" class="card-stack">
+              <h4>Фото для программ ЭВМ</h4>
+              <input id="portfolio-programs-photo-file" type="file" accept="image/*" required />
+              <button class="primary-button" type="submit">Загрузить фото</button>
+            </form>
+
+            <form id="portfolio-events-photo-form" class="card-stack">
+              <h4>Фото для конференций</h4>
+              <input id="portfolio-events-photo-file" type="file" accept="image/*" required />
+              <button class="primary-button" type="submit">Загрузить фото</button>
+            </form>
+          </div>
+
           <div class="admin-tables">
             <div class="card-stack">
               <h4>Свободные слоты</h4>
@@ -133,6 +171,20 @@
           </div>
         </section>
       </main>
+    </div>
+
+    <div id="portfolio-modal" class="modal hidden">
+      <div class="modal-backdrop" data-close-portfolio="true"></div>
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <p class="section-label">Портфолио</p>
+            <h3>Достижения и публикации</h3>
+          </div>
+          <button id="close-portfolio-button" class="ghost-button" type="button">Закрыть</button>
+        </div>
+        <div id="portfolio-list" class="portfolio-list"></div>
+      </div>
     </div>
 
     <script src="/static/app.js" type="module"></script>

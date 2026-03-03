@@ -3,10 +3,17 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class PortfolioSectionOut(BaseModel):
+    title: str
+    text: str
+    photo_url: str | None = None
+
+
 class TutorProfileOut(BaseModel):
     tutor_name: str
     about_text: str
     tutor_photo_url: str | None = None
+    portfolio_sections: list[PortfolioSectionOut]
 
 
 class UserSummary(BaseModel):
@@ -61,6 +68,9 @@ class SlotCreate(BaseModel):
 class ProfileUpdate(BaseModel):
     tutor_name: str = Field(min_length=2, max_length=255)
     about_text: str = Field(min_length=10, max_length=4000)
+    portfolio_articles_text: str = Field(min_length=10, max_length=4000)
+    portfolio_programs_text: str = Field(min_length=10, max_length=4000)
+    portfolio_events_text: str = Field(min_length=10, max_length=4000)
 
 
 class BookingListItem(BaseModel):
