@@ -9,9 +9,9 @@ const state = {
 };
 
 const DEFAULT_STUDENT_AVATAR =
-  "data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'%3e%3crect width='128' height='128' rx='28' fill='%23f1d4b4'/%3e%3ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='%236e4f3d' font-family='Segoe UI' font-size='34'%3eTG%3c/text%3e%3c/svg%3e";
+  "data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'%3e%3crect width='128' height='128' rx='28' fill='%2313284c'/%3e%3ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='%23edf4ff' font-family='Segoe UI' font-size='34'%3eTG%3c/text%3e%3c/svg%3e";
 const DEFAULT_TUTOR_PHOTO =
-  "data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='640' height='640' viewBox='0 0 640 640'%3e%3crect width='640' height='640' rx='36' fill='%23ecd3bd'/%3e%3ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%236e4f3d' font-family='Segoe UI' font-size='44'%3e%D0%A4%D0%BE%D1%82%D0%BE%3c/text%3e%3c/svg%3e";
+  "data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='640' height='640' viewBox='0 0 640 640'%3e%3crect width='640' height='640' rx='36' fill='%2313284c'/%3e%3ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23edf4ff' font-family='Segoe UI' font-size='44'%3e%D0%A4%D0%BE%D1%82%D0%BE%3c/text%3e%3c/svg%3e";
 
 const elements = {
   studentAvatar: document.getElementById("student-avatar"),
@@ -20,6 +20,8 @@ const elements = {
   aboutText: document.getElementById("about-text"),
   tutorPhoto: document.getElementById("tutor-photo"),
   roleBadge: document.getElementById("role-badge"),
+  promoStatus: document.getElementById("promo-status"),
+  inviteFriendButton: document.getElementById("invite-friend-button"),
   statusCard: document.getElementById("status-card"),
   daysRow: document.getElementById("days-row"),
   slotsGrid: document.getElementById("slots-grid"),
@@ -45,8 +47,8 @@ function initTelegram() {
 
   tg.ready();
   tg.expand();
-  tg.setHeaderColor("#f7f1e8");
-  tg.setBackgroundColor("#f7f1e8");
+  tg.setHeaderColor("#091224");
+  tg.setBackgroundColor("#091224");
 }
 
 function getTelegramInitData() {
@@ -103,6 +105,15 @@ function toDayKey(dateString) {
   return `${year}-${month}-${day}`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function notify(message) {
   if (tg?.showAlert) {
     tg.showAlert(message);
@@ -121,6 +132,7 @@ function confirmAction(message) {
   if (typeof window.confirm === "function") {
     return Promise.resolve(window.confirm(message));
   }
+
   return Promise.resolve(true);
 }
 
@@ -135,6 +147,28 @@ function buildDayMap(slots) {
   }, {});
 }
 
+function renderPromo() {
+  const referral = state.me.referral;
+  const statuses = [];
+
+  if (referral.current_slot_discount_percent === 50) {
+    statuses.push("У вас активна скидка 50% на следующую запись.");
+  } else if (referral.current_slot_discount_percent === 20) {
+    statuses.push("Для вас активна скидка 20% на первую запись по приглашению.");
+  }
+
+  if (referral.reward_count > 0) {
+    statuses.push(`Доступно бонусов 50%: ${referral.reward_count}.`);
+  }
+
+  if (referral.link_copied) {
+    statuses.push("Реферальная ссылка уже копировалась.");
+  }
+
+  elements.promoStatus.textContent =
+    statuses.join(" ") || "Скопируйте ссылку и отправьте ее другу прямо из Telegram.";
+}
+
 function renderProfile() {
   const { user, profile, upcoming_bookings: upcomingBookings } = state.me;
   elements.greetingTitle.textContent = `Здравствуйте, ${user.first_name}`;
@@ -143,6 +177,8 @@ function renderProfile() {
   elements.aboutText.textContent = profile.about_text;
   elements.tutorPhoto.src = profile.tutor_photo_url || DEFAULT_TUTOR_PHOTO;
   elements.roleBadge.classList.toggle("hidden", !user.is_admin);
+
+  renderPromo();
 
   if (upcomingBookings.length) {
     elements.statusCard.classList.remove("hidden");
@@ -160,6 +196,11 @@ function renderProfile() {
                   minute: "2-digit",
                 })}</strong>
                 <span>До ${formatDate(booking.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
+                ${
+                  booking.discount_label
+                    ? `<span class="discount-meta">${escapeHtml(booking.discount_label)}</span>`
+                    : ""
+                }
               </div>
               <button class="danger-button" data-cancel-own-booking="${booking.id}" type="button">Отменить</button>
             </div>
@@ -211,10 +252,15 @@ function renderSlots() {
     .map((slot) => {
       const start = formatDate(slot.start_at, { hour: "2-digit", minute: "2-digit" });
       const end = formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" });
+      const discountBadge =
+        slot.discount_percent > 0
+          ? `<span class="slot-discount-badge">Скидка ${slot.discount_percent}%</span>`
+          : "";
       return `
         <button class="slot-button" data-slot-id="${slot.id}" type="button">
           <strong>${start} - ${end}</strong>
           <span>Записаться</span>
+          ${discountBadge}
         </button>
       `;
     })
@@ -241,33 +287,39 @@ function renderAdminSlots() {
           `,
         )
         .join("")
-    : `<p>Свободных слотов пока нет.</p>`;
+    : "<p>Свободных слотов пока нет.</p>";
 }
 
 function renderAdminBookings() {
   elements.adminBookings.innerHTML = state.adminBookings.length
     ? state.adminBookings
-        .map(
-          (booking) => `
+        .map((booking) => {
+          const username = booking.username ? ` (@${escapeHtml(booking.username)})` : "";
+          const discountMeta =
+            booking.discount_percent > 0
+              ? `<span class="discount-meta">Скидка ${booking.discount_percent}%</span>`
+              : "";
+          return `
             <div class="list-item">
               <div>
-                <strong>${booking.user_first_name}${booking.username ? ` (@${booking.username})` : ""}</strong>
+                <strong>${escapeHtml(booking.user_first_name)}${username}</strong>
                 <span>${formatDate(booking.start_at, {
                   day: "2-digit",
                   month: "2-digit",
                   hour: "2-digit",
                   minute: "2-digit",
                 })} - ${formatDate(booking.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
+                ${discountMeta}
               </div>
               <div>
                 <span>ID: ${booking.user_telegram_id}</span>
                 <button class="danger-button" data-cancel-booking="${booking.id}" type="button">Отменить</button>
               </div>
             </div>
-          `,
-        )
+          `;
+        })
         .join("")
-    : `<p>Записей пока нет.</p>`;
+    : "<p>Записей пока нет.</p>";
 }
 
 async function loadMe() {
@@ -369,6 +421,25 @@ async function deleteSlot(slotId) {
   await refreshAll();
 }
 
+async function inviteFriend() {
+  const referral = await apiFetch("/api/referrals/copy", { method: "POST" });
+  state.me.referral = referral;
+  renderPromo();
+
+  if (!referral.referral_link) {
+    notify("Ссылка на бота пока недоступна.");
+    return;
+  }
+
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(referral.referral_link);
+    notify("Ссылка приглашения скопирована.");
+    return;
+  }
+
+  notify(`Скопируйте ссылку вручную: ${referral.referral_link}`);
+}
+
 document.addEventListener("click", async (event) => {
   const dayButton = event.target.closest("[data-day]");
   if (dayButton) {
@@ -450,6 +521,14 @@ elements.slotForm.addEventListener("submit", async (event) => {
 elements.refreshButton.addEventListener("click", async () => {
   try {
     await refreshAll();
+  } catch (error) {
+    notify(error.message);
+  }
+});
+
+elements.inviteFriendButton.addEventListener("click", async () => {
+  try {
+    await inviteFriend();
   } catch (error) {
     notify(error.message);
   }

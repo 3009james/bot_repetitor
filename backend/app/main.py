@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.bot import bot, dp
+from app.bot import bot, dp, initialize_bot_profile
 from app.config import get_settings
 from app.db import Base, engine
 from app.reminders import ensure_runtime_schema, reminder_worker
@@ -27,6 +27,7 @@ async def lifespan(_: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await ensure_runtime_schema()
+    await initialize_bot_profile()
 
     polling_task = asyncio.create_task(dp.start_polling(bot))
     reminder_task = asyncio.create_task(reminder_worker())

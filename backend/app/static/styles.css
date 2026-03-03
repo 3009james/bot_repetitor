@@ -186,7 +186,7 @@ h3 {
 .status-card {
   margin-top: 22px;
   padding: 18px 22px;
-  color: var(--success);
+  color: var(--text);
   font-weight: 700;
 }
 
@@ -198,6 +198,58 @@ h3 {
 .status-card strong {
   margin-bottom: 8px;
   font-size: 18px;
+}
+
+.promo-panel {
+  margin-top: 22px;
+}
+
+.promo-text {
+  margin: 18px 0 0;
+  max-width: 760px;
+  color: #d9e6ff;
+  line-height: 1.7;
+}
+
+.promo-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.promo-badge,
+.slot-discount-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.promo-badge {
+  padding: 10px 14px;
+  background: rgba(79, 140, 255, 0.16);
+  color: #9fc4ff;
+  border: 1px solid rgba(79, 140, 255, 0.24);
+}
+
+.promo-status {
+  margin: 16px 0 0;
+  color: var(--muted);
+}
+
+.slot-discount-badge {
+  margin-top: 10px;
+  padding: 6px 10px;
+  background: rgba(103, 212, 163, 0.14);
+  color: var(--success);
+  font-size: 12px;
+}
+
+.discount-meta {
+  margin-top: 6px;
+  color: var(--success);
 }
 
 .status-card-actions {

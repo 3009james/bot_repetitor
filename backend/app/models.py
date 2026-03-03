@@ -18,9 +18,18 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
     photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    referred_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    referred_discount_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    referral_link_copied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    referral_link_copy_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     bookings: Mapped[list["Booking"]] = relationship(back_populates="user")
+    referred_by: Mapped["User | None"] = relationship(remote_side=[id])
+    referral_rewards: Mapped[list["ReferralReward"]] = relationship(
+        back_populates="owner",
+        foreign_keys="ReferralReward.owner_user_id",
+    )
 
 
 class TutorProfile(Base):
@@ -62,6 +71,27 @@ class Booking(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    discount_percent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    discount_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="bookings")
     slot: Mapped[AvailabilitySlot] = relationship(back_populates="booking")
+
+
+class ReferralReward(Base):
+    __tablename__ = "referral_rewards"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    invitee_user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    source_booking_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    used_booking_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reward_percent: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="available", nullable=False)
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    owner: Mapped[User] = relationship(
+        back_populates="referral_rewards",
+        foreign_keys=[owner_user_id],
+    )

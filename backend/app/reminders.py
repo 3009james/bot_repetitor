@@ -16,6 +16,54 @@ async def ensure_runtime_schema() -> None:
         await session.execute(
             text(
                 """
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS referred_by_user_id INTEGER NULL
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS referred_discount_used_at TIMESTAMPTZ NULL
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS referral_link_copied_at TIMESTAMPTZ NULL
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS referral_link_copy_count INTEGER NOT NULL DEFAULT 0
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE bookings
+                ADD COLUMN IF NOT EXISTS discount_percent INTEGER NOT NULL DEFAULT 0
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE bookings
+                ADD COLUMN IF NOT EXISTS discount_source VARCHAR(64) NULL
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
                 ALTER TABLE bookings
                 ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ NULL
                 """

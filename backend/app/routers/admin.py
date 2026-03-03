@@ -11,6 +11,7 @@ from app.db import get_session
 from app.dependencies import require_admin
 from app.bot import notify_admin_cancellation, notify_student_cancellation
 from app.models import AvailabilitySlot, Booking, User
+from app.referrals import rollback_referral_on_cancellation
 from app.routers.public import get_or_create_profile
 from app.schemas import BookingListItem, ProfileUpdate, SlotCreate, SlotOut, TutorProfileOut
 
@@ -149,6 +150,7 @@ async def list_bookings(
             user_telegram_id=user.telegram_id,
             start_at=slot.start_at,
             end_at=slot.end_at,
+            discount_percent=booking.discount_percent,
         )
         for booking, user, slot in rows
     ]
@@ -175,6 +177,7 @@ async def cancel_booking(
     slot_start = slot.start_at.astimezone().strftime("%d.%m.%Y %H:%M")
     slot_end = slot.end_at.astimezone().strftime("%H:%M")
 
+    await rollback_referral_on_cancellation(session, booking, user)
     await session.delete(booking)
     await session.commit()
 

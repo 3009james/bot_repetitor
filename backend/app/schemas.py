@@ -23,18 +23,32 @@ class BookingInfo(BaseModel):
     start_at: datetime
     end_at: datetime
     created_at: datetime
+    discount_percent: int = 0
+    discount_label: str | None = None
+
+
+class ReferralInfoOut(BaseModel):
+    referral_link: str | None = None
+    link_copied: bool
+    friend_discount_percent: int = 20
+    owner_discount_percent: int = 50
+    current_slot_discount_percent: int = 0
+    reward_count: int = 0
+    referred_discount_available: bool = False
 
 
 class MeResponse(BaseModel):
     user: UserSummary
     profile: TutorProfileOut
     upcoming_bookings: list[BookingInfo]
+    referral: ReferralInfoOut
 
 
 class SlotOut(BaseModel):
     id: int
     start_at: datetime
     end_at: datetime
+    discount_percent: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -57,3 +71,4 @@ class BookingListItem(BaseModel):
     user_telegram_id: int
     start_at: datetime
     end_at: datetime
+    discount_percent: int = 0
