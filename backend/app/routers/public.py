@@ -43,19 +43,18 @@ async def read_me(
             AvailabilitySlot.start_at >= datetime.now(UTC),
         )
         .order_by(AvailabilitySlot.start_at.asc())
-        .limit(1)
     )
     booking_result = await session.execute(booking_query)
-    booking_row = booking_result.first()
-    active_booking = None
-    if booking_row:
-        booking, slot = booking_row
-        active_booking = BookingInfo(
+    upcoming_bookings = []
+    for booking, slot in booking_result.all():
+        upcoming_bookings.append(
+            BookingInfo(
             id=booking.id,
             slot_id=slot.id,
             start_at=slot.start_at,
             end_at=slot.end_at,
             created_at=booking.created_at,
+        )
         )
 
     return MeResponse(
@@ -71,7 +70,7 @@ async def read_me(
             about_text=profile.about_text,
             tutor_photo_url=profile.tutor_photo_path,
         ),
-        active_booking=active_booking,
+        upcoming_bookings=upcoming_bookings,
     )
 
 
@@ -80,18 +79,6 @@ async def list_slots(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> list[SlotOut]:
-    has_booking = await session.execute(
-        select(Booking.id)
-        .join(AvailabilitySlot, Booking.slot_id == AvailabilitySlot.id)
-        .where(
-            Booking.user_id == current_user.id,
-            AvailabilitySlot.start_at >= datetime.now(UTC),
-        )
-        .limit(1)
-    )
-    if has_booking.scalar_one_or_none():
-        return []
-
     query = (
         select(AvailabilitySlot)
         .outerjoin(Booking, Booking.slot_id == AvailabilitySlot.id)
@@ -115,19 +102,6 @@ async def create_booking(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> BookingInfo:
-    existing_booking_result = await session.execute(
-        select(Booking, AvailabilitySlot)
-        .join(AvailabilitySlot, Booking.slot_id == AvailabilitySlot.id)
-        .where(
-            Booking.user_id == current_user.id,
-            AvailabilitySlot.start_at >= datetime.now(UTC),
-        )
-        .limit(1)
-    )
-    existing_booking = existing_booking_result.first()
-    if existing_booking:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="У вас уже есть активная запись")
-
     slot_result = await session.execute(
         select(AvailabilitySlot)
         .where(AvailabilitySlot.id == slot_id, AvailabilitySlot.is_active.is_(True))
@@ -171,8 +145,9 @@ async def create_booking(
     )
 
 
-@router.delete("/bookings/current", status_code=status.HTTP_204_NO_CONTENT)
-async def cancel_current_booking(
+@router.delete("/bookings/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_booking(
+    booking_id: int,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> None:
@@ -181,14 +156,14 @@ async def cancel_current_booking(
         .join(AvailabilitySlot, Booking.slot_id == AvailabilitySlot.id)
         .where(
             Booking.user_id == current_user.id,
+            Booking.id == booking_id,
             AvailabilitySlot.start_at >= datetime.now(UTC),
         )
-        .order_by(AvailabilitySlot.start_at.asc())
         .limit(1)
     )
     booking_row = booking_result.first()
     if not booking_row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Активная запись не найдена")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена")
 
     booking, slot = booking_row
     slot_start = slot.start_at.astimezone().strftime("%d.%m.%Y %H:%M")

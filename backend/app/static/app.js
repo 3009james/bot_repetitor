@@ -136,7 +136,7 @@ function buildDayMap(slots) {
 }
 
 function renderProfile() {
-  const { user, profile, active_booking: activeBooking } = state.me;
+  const { user, profile, upcoming_bookings: upcomingBookings } = state.me;
   elements.greetingTitle.textContent = `Здравствуйте, ${user.first_name}`;
   elements.studentAvatar.src = user.photo_url || DEFAULT_STUDENT_AVATAR;
   elements.tutorName.textContent = profile.tutor_name;
@@ -144,19 +144,28 @@ function renderProfile() {
   elements.tutorPhoto.src = profile.tutor_photo_url || DEFAULT_TUTOR_PHOTO;
   elements.roleBadge.classList.toggle("hidden", !user.is_admin);
 
-  if (activeBooking) {
+  if (upcomingBookings.length) {
     elements.statusCard.classList.remove("hidden");
     elements.statusCard.innerHTML = `
-      <strong>У вас есть активная запись</strong>
-      <span>Вы записаны на ${formatDate(activeBooking.start_at, {
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      })}.</span>
-      <div class="status-card-actions">
-        <button class="danger-button" data-cancel-own-booking="true" type="button">Отменить запись</button>
-      </div>
+      <strong>Ваши ближайшие записи</strong>
+      ${upcomingBookings
+        .map(
+          (booking) => `
+            <div class="list-item">
+              <div>
+                <strong>${formatDate(booking.start_at, {
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}</strong>
+                <span>До ${formatDate(booking.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
+              </div>
+              <button class="danger-button" data-cancel-own-booking="${booking.id}" type="button">Отменить</button>
+            </div>
+          `,
+        )
+        .join("")}
     `;
   } else {
     elements.statusCard.classList.add("hidden");
@@ -178,9 +187,7 @@ function renderSlots() {
     elements.daysRow.innerHTML = "";
     elements.slotsGrid.innerHTML = "";
     elements.emptyState.classList.remove("hidden");
-    elements.emptyState.textContent = state.me?.active_booking
-      ? "У вас уже есть активная запись. Свободные слоты снова появятся после нее."
-      : "Свободных слотов пока нет.";
+    elements.emptyState.textContent = "Свободных слотов пока нет.";
     return;
   }
 
@@ -300,8 +307,8 @@ async function createBooking(slotId) {
   await refreshAll();
 }
 
-async function cancelMyBooking() {
-  await apiFetch("/api/bookings/current", { method: "DELETE" });
+async function cancelMyBooking(bookingId) {
+  await apiFetch(`/api/bookings/${bookingId}`, { method: "DELETE" });
   notify("Запись отменена.");
   await refreshAll();
 }
@@ -396,7 +403,7 @@ document.addEventListener("click", async (event) => {
       return;
     }
     try {
-      await cancelMyBooking();
+      await cancelMyBooking(ownCancelButton.dataset.cancelOwnBooking);
     } catch (error) {
       notify(error.message);
     }

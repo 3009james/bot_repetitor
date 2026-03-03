@@ -28,7 +28,7 @@ class BookingInfo(BaseModel):
 class MeResponse(BaseModel):
     user: UserSummary
     profile: TutorProfileOut
-    active_booking: BookingInfo | None = None
+    upcoming_bookings: list[BookingInfo]
 
 
 class SlotOut(BaseModel):
@@ -57,4 +57,3 @@ class BookingListItem(BaseModel):
     user_telegram_id: int
     start_at: datetime
     end_at: datetime
-
