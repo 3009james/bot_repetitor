@@ -147,6 +147,33 @@ function buildDayMap(slots) {
   }, {});
 }
 
+function normalizeMeResponse(payload) {
+  return {
+    user: payload?.user || {
+      telegram_id: 0,
+      first_name: "Ученик",
+      username: null,
+      photo_url: null,
+      is_admin: false,
+    },
+    profile: payload?.profile || {
+      tutor_name: "Ваш репетитор",
+      about_text: "",
+      tutor_photo_url: null,
+    },
+    upcoming_bookings: Array.isArray(payload?.upcoming_bookings) ? payload.upcoming_bookings : [],
+    referral: payload?.referral || {
+      referral_link: null,
+      link_copied: false,
+      friend_discount_percent: 20,
+      owner_discount_percent: 50,
+      current_slot_discount_percent: 0,
+      reward_count: 0,
+      referred_discount_available: false,
+    },
+  };
+}
+
 function renderPromo() {
   const referral = state.me.referral;
   const statuses = [];
@@ -323,7 +350,7 @@ function renderAdminBookings() {
 }
 
 async function loadMe() {
-  state.me = await apiFetch("/api/me");
+  state.me = normalizeMeResponse(await apiFetch("/api/me"));
   renderProfile();
 }
 
