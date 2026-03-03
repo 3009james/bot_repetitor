@@ -311,6 +311,12 @@ h3 {
   scroll-snap-type: x proximity;
   touch-action: pan-x;
   overscroll-behavior-x: contain;
+  cursor: grab;
+}
+
+.days-row.dragging {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .days-row::-webkit-scrollbar {

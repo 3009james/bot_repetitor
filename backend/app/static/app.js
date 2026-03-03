@@ -6,6 +6,11 @@ const state = {
   adminSlots: [],
   adminBookings: [],
   selectedDay: null,
+  daysDrag: {
+    active: false,
+    startX: 0,
+    startScrollLeft: 0,
+  },
 };
 
 const DEFAULT_STUDENT_AVATAR =
@@ -147,6 +152,50 @@ function buildDayMap(slots) {
   }, {});
 }
 
+function setupDaysDesktopScroll() {
+  const row = elements.daysRow;
+  if (!row || row.dataset.desktopScrollReady === "true") {
+    return;
+  }
+
+  row.dataset.desktopScrollReady = "true";
+
+  row.addEventListener(
+    "wheel",
+    (event) => {
+      if (Math.abs(event.deltaY) < Math.abs(event.deltaX) && event.deltaX === 0) {
+        return;
+      }
+      row.scrollLeft += event.deltaY || event.deltaX;
+      event.preventDefault();
+    },
+    { passive: false },
+  );
+
+  row.addEventListener("mousedown", (event) => {
+    state.daysDrag.active = true;
+    state.daysDrag.startX = event.clientX;
+    state.daysDrag.startScrollLeft = row.scrollLeft;
+    row.classList.add("dragging");
+  });
+
+  window.addEventListener("mousemove", (event) => {
+    if (!state.daysDrag.active) {
+      return;
+    }
+    const deltaX = event.clientX - state.daysDrag.startX;
+    row.scrollLeft = state.daysDrag.startScrollLeft - deltaX;
+  });
+
+  const stopDragging = () => {
+    state.daysDrag.active = false;
+    row.classList.remove("dragging");
+  };
+
+  window.addEventListener("mouseup", stopDragging);
+  row.addEventListener("mouseleave", stopDragging);
+}
+
 function normalizeMeResponse(payload) {
   return {
     user: payload?.user || {
@@ -252,6 +301,8 @@ function renderProfile() {
 }
 
 function renderSlots() {
+  setupDaysDesktopScroll();
+
   const dayMap = buildDayMap(state.slots);
   const dayKeys = Object.keys(dayMap);
 
