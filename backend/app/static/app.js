@@ -175,6 +175,10 @@ function normalizeMeResponse(payload) {
 }
 
 function renderPromo() {
+  if (!elements.promoStatus) {
+    return;
+  }
+
   const referral = state.me.referral;
   const statuses = [];
 
@@ -533,7 +537,7 @@ document.addEventListener("click", async (event) => {
   }
 });
 
-elements.profileForm.addEventListener("submit", async (event) => {
+elements.profileForm?.addEventListener("submit", async (event) => {
   try {
     await saveProfile(event);
   } catch (error) {
@@ -541,7 +545,7 @@ elements.profileForm.addEventListener("submit", async (event) => {
   }
 });
 
-elements.photoForm.addEventListener("submit", async (event) => {
+elements.photoForm?.addEventListener("submit", async (event) => {
   try {
     await uploadPhoto(event);
   } catch (error) {
@@ -549,7 +553,7 @@ elements.photoForm.addEventListener("submit", async (event) => {
   }
 });
 
-elements.slotForm.addEventListener("submit", async (event) => {
+elements.slotForm?.addEventListener("submit", async (event) => {
   try {
     await createSlot(event);
   } catch (error) {
@@ -557,7 +561,7 @@ elements.slotForm.addEventListener("submit", async (event) => {
   }
 });
 
-elements.refreshButton.addEventListener("click", async () => {
+elements.refreshButton?.addEventListener("click", async () => {
   try {
     await refreshAll();
   } catch (error) {
@@ -565,7 +569,7 @@ elements.refreshButton.addEventListener("click", async () => {
   }
 });
 
-elements.inviteFriendButton.addEventListener("click", async () => {
+elements.inviteFriendButton?.addEventListener("click", async () => {
   try {
     await inviteFriend();
   } catch (error) {
