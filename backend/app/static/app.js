@@ -450,6 +450,18 @@ document.addEventListener("click", async (event) => {
 
   const slotButton = event.target.closest("[data-slot-id]");
   if (slotButton) {
+    const slot = state.slots.find((item) => String(item.id) === String(slotButton.dataset.slotId));
+    const slotLabel = slot
+      ? `${formatDate(slot.start_at, {
+          day: "2-digit",
+          month: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        })} - ${formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" })}`
+      : "выбранное время";
+    if (!(await confirmAction(`Подтвердите запись на ${slotLabel}?`))) {
+      return;
+    }
     try {
       await createBooking(slotButton.dataset.slotId);
     } catch (error) {

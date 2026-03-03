@@ -45,7 +45,7 @@ textarea {
 
 .app-shell {
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 .ambient {
@@ -303,9 +303,14 @@ h3 {
   display: flex;
   gap: 12px;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 8px 0 6px;
   margin-top: 22px;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
 }
 
 .days-row::-webkit-scrollbar {
@@ -313,6 +318,7 @@ h3 {
 }
 
 .day-pill {
+  flex: 0 0 auto;
   min-width: 112px;
   padding: 14px 16px;
   border-radius: 20px;
@@ -320,6 +326,7 @@ h3 {
   background: var(--surface-strong);
   color: var(--text);
   cursor: pointer;
+  scroll-snap-align: start;
 }
 
 .day-pill.active {
