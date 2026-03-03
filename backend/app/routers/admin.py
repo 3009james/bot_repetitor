@@ -3,7 +3,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot import notify_admin_cancellation, notify_student_cancellation
@@ -11,9 +11,17 @@ from app.config import get_settings
 from app.db import get_session
 from app.dependencies import require_admin
 from app.models import AvailabilitySlot, Booking, User
-from app.referrals import rollback_referral_on_cancellation
+from app.referrals import get_effective_discount_info, rollback_referral_on_cancellation
 from app.routers.public import build_profile_payload, get_or_create_profile
-from app.schemas import BookingListItem, ProfileUpdate, SlotCreate, SlotOut, TutorProfileOut
+from app.schemas import (
+    BookingListItem,
+    ProfileUpdate,
+    SlotCreate,
+    SlotOut,
+    StudentDiscountItem,
+    StudentDiscountUpdate,
+    TutorProfileOut,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -175,6 +183,69 @@ async def list_bookings(
         )
         for booking, user, slot in rows
     ]
+
+
+@router.get("/students", response_model=list[StudentDiscountItem])
+async def list_students(
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> list[StudentDiscountItem]:
+    result = await session.execute(
+        select(User)
+        .where(User.is_admin.is_(False))
+        .order_by(User.created_at.asc())
+    )
+    users = list(result.scalars().all())
+    items: list[StudentDiscountItem] = []
+    for user in users:
+        bookings_count_result = await session.execute(
+            select(func.count(Booking.id)).where(Booking.user_id == user.id)
+        )
+        effective_discount = await get_effective_discount_info(session, user)
+        items.append(
+            StudentDiscountItem(
+                id=user.id,
+                telegram_id=user.telegram_id,
+                first_name=user.first_name,
+                username=user.username,
+                admin_discount_percent=user.admin_discount_percent,
+                current_discount_percent=effective_discount.discount_percent,
+                current_discount_label=effective_discount.discount_label,
+                bookings_count=int(bookings_count_result.scalar_one() or 0),
+            )
+        )
+    return items
+
+
+@router.patch("/students/{user_id}/discount", response_model=StudentDiscountItem)
+async def update_student_discount(
+    user_id: int,
+    payload: StudentDiscountUpdate,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> StudentDiscountItem:
+    user = await session.get(User, user_id)
+    if user is None or user.is_admin:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ученик не найден")
+
+    user.admin_discount_percent = payload.admin_discount_percent
+    await session.commit()
+    await session.refresh(user)
+
+    bookings_count_result = await session.execute(
+        select(func.count(Booking.id)).where(Booking.user_id == user.id)
+    )
+    effective_discount = await get_effective_discount_info(session, user)
+    return StudentDiscountItem(
+        id=user.id,
+        telegram_id=user.telegram_id,
+        first_name=user.first_name,
+        username=user.username,
+        admin_discount_percent=user.admin_discount_percent,
+        current_discount_percent=effective_discount.discount_percent,
+        current_discount_label=effective_discount.discount_label,
+        bookings_count=int(bookings_count_result.scalar_one() or 0),
+    )
 
 
 @router.delete("/bookings/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)

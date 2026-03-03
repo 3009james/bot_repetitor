@@ -17,6 +17,14 @@ async def ensure_runtime_schema() -> None:
             text(
                 """
                 ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS admin_discount_percent INTEGER NULL
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE users
                 ADD COLUMN IF NOT EXISTS referred_by_user_id INTEGER NULL
                 """
             )

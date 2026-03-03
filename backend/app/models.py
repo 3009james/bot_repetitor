@@ -18,6 +18,7 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
     photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    admin_discount_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
     referred_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     referred_discount_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     referral_link_copied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

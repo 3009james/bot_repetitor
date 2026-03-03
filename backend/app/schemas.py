@@ -82,3 +82,18 @@ class BookingListItem(BaseModel):
     start_at: datetime
     end_at: datetime
     discount_percent: int = 0
+
+
+class StudentDiscountItem(BaseModel):
+    id: int
+    telegram_id: int
+    first_name: str
+    username: str | None = None
+    admin_discount_percent: int | None = None
+    current_discount_percent: int = 0
+    current_discount_label: str | None = None
+    bookings_count: int = 0
+
+
+class StudentDiscountUpdate(BaseModel):
+    admin_discount_percent: int | None = Field(default=None, ge=0, le=100)

@@ -5,6 +5,7 @@ const state = {
   slots: [],
   adminSlots: [],
   adminBookings: [],
+  students: [],
   selectedDay: null,
   daysDrag: {
     active: false,
@@ -59,6 +60,9 @@ const elements = {
   adminSlots: document.getElementById("admin-slots"),
   adminBookings: document.getElementById("admin-bookings"),
   refreshButton: document.getElementById("refresh-button"),
+  toggleStudentsButton: document.getElementById("toggle-students-button"),
+  studentsPanel: document.getElementById("students-panel"),
+  studentsList: document.getElementById("students-list"),
 };
 
 function initTelegram() {
@@ -437,6 +441,45 @@ function renderAdminBookings() {
     : "<p>Записей пока нет.</p>";
 }
 
+function renderStudents() {
+  if (!elements.studentsList) {
+    return;
+  }
+
+  elements.studentsList.innerHTML = state.students.length
+    ? state.students
+        .map(
+          (student) => `
+            <article class="student-card">
+              <div>
+                <strong>${escapeHtml(student.first_name)}${student.username ? ` (@${escapeHtml(student.username)})` : ""}</strong>
+                <span>ID: ${student.telegram_id}</span>
+                <span>Записей всего: ${student.bookings_count}</span>
+                <span>${student.current_discount_label || "Скидки нет"}</span>
+              </div>
+              <div class="student-actions">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value="${student.admin_discount_percent ?? ""}"
+                  placeholder="Скидка %"
+                  data-student-discount-input="${student.id}"
+                />
+                <div class="student-buttons">
+                  <button class="primary-button" data-save-student-discount="${student.id}" type="button">Сохранить</button>
+                  <button class="danger-button" data-disable-student-discount="${student.id}" type="button">Убрать скидку</button>
+                  <button class="secondary-button" data-auto-student-discount="${student.id}" type="button">Авто</button>
+                </div>
+              </div>
+            </article>
+          `,
+        )
+        .join("")
+    : "<p>Пока нет учеников.</p>";
+}
+
 async function loadMe() {
   state.me = normalizeMeResponse(await apiFetch("/api/me"));
   renderProfile();
@@ -451,11 +494,17 @@ async function loadAdminData() {
   if (!state.me?.user?.is_admin) {
     return;
   }
-  const [slots, bookings] = await Promise.all([apiFetch("/api/admin/slots"), apiFetch("/api/admin/bookings")]);
+  const [slots, bookings, students] = await Promise.all([
+    apiFetch("/api/admin/slots"),
+    apiFetch("/api/admin/bookings"),
+    apiFetch("/api/admin/students"),
+  ]);
   state.adminSlots = slots;
   state.adminBookings = bookings;
+  state.students = students;
   renderAdminSlots();
   renderAdminBookings();
+  renderStudents();
 }
 
 async function refreshAll() {
@@ -559,6 +608,16 @@ async function inviteFriend() {
   notify(`Скопируйте ссылку вручную: ${referral.referral_link}`);
 }
 
+async function updateStudentDiscount(userId, adminDiscountPercent) {
+  const updatedStudent = await apiFetch(`/api/admin/students/${userId}/discount`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ admin_discount_percent: adminDiscountPercent }),
+  });
+  state.students = state.students.map((student) => (student.id === updatedStudent.id ? updatedStudent : student));
+  renderStudents();
+}
+
 document.addEventListener("click", async (event) => {
   const dayButton = event.target.closest("[data-day]");
   if (dayButton) {
@@ -620,6 +679,47 @@ document.addEventListener("click", async (event) => {
     }
     try {
       await cancelBookingAsAdmin(adminCancelButton.dataset.cancelBooking);
+    } catch (error) {
+      notify(error.message);
+    }
+    return;
+  }
+
+  const saveDiscountButton = event.target.closest("[data-save-student-discount]");
+  if (saveDiscountButton) {
+    const input = document.querySelector(
+      `[data-student-discount-input="${saveDiscountButton.dataset.saveStudentDiscount}"]`,
+    );
+    const value = input?.value?.trim();
+    if (!value) {
+      notify("Введите процент скидки от 0 до 100.");
+      return;
+    }
+    try {
+      await updateStudentDiscount(saveDiscountButton.dataset.saveStudentDiscount, Number(value));
+      notify("Скидка сохранена.");
+    } catch (error) {
+      notify(error.message);
+    }
+    return;
+  }
+
+  const disableDiscountButton = event.target.closest("[data-disable-student-discount]");
+  if (disableDiscountButton) {
+    try {
+      await updateStudentDiscount(disableDiscountButton.dataset.disableStudentDiscount, 0);
+      notify("Скидка отключена.");
+    } catch (error) {
+      notify(error.message);
+    }
+    return;
+  }
+
+  const autoDiscountButton = event.target.closest("[data-auto-student-discount]");
+  if (autoDiscountButton) {
+    try {
+      await updateStudentDiscount(autoDiscountButton.dataset.autoStudentDiscount, null);
+      notify("Возврат в автоматический режим выполнен.");
     } catch (error) {
       notify(error.message);
     }
@@ -704,6 +804,9 @@ elements.inviteFriendButton?.addEventListener("click", async () => {
 });
 elements.openPortfolioButton?.addEventListener("click", openPortfolioModal);
 elements.closePortfolioButton?.addEventListener("click", closePortfolioModal);
+elements.toggleStudentsButton?.addEventListener("click", () => {
+  elements.studentsPanel?.classList.toggle("hidden");
+});
 
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {

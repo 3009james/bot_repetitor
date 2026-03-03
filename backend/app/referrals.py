@@ -19,11 +19,22 @@ class ReferralBookingOutcome:
     reward_owner_telegram_id: int | None = None
 
 
+@dataclass(slots=True)
+class EffectiveDiscountInfo:
+    discount_percent: int = 0
+    discount_source: str | None = None
+    discount_label: str | None = None
+
+
 def describe_discount(discount_percent: int, discount_source: str | None) -> str | None:
+    if discount_source == "admin_manual":
+        return f"Ручная скидка {discount_percent}%"
+    if discount_source == "admin_disabled":
+        return "Скидки отключены администратором"
     if discount_source == "referral_welcome":
         return 'Скидка 20% по акции "Приведи друга"'
     if discount_source == "referral_reward":
-        return 'Скидка 50% за друга'
+        return "Скидка 50% за друга"
     if discount_percent > 0:
         return f"Скидка {discount_percent}%"
     return None
@@ -39,13 +50,39 @@ async def count_available_rewards(session: AsyncSession, user_id: int) -> int:
     return int(result.scalar_one() or 0)
 
 
-async def get_current_slot_discount_percent(session: AsyncSession, user: User) -> int:
+async def get_effective_discount_info(session: AsyncSession, user: User) -> EffectiveDiscountInfo:
+    if user.admin_discount_percent is not None:
+        if user.admin_discount_percent > 0:
+            return EffectiveDiscountInfo(
+                discount_percent=user.admin_discount_percent,
+                discount_source="admin_manual",
+                discount_label=describe_discount(user.admin_discount_percent, "admin_manual"),
+            )
+        return EffectiveDiscountInfo(
+            discount_percent=0,
+            discount_source="admin_disabled",
+            discount_label=describe_discount(0, "admin_disabled"),
+        )
+
     reward_count = await count_available_rewards(session, user.id)
     if reward_count > 0:
-        return REFERRAL_OWNER_DISCOUNT
+        return EffectiveDiscountInfo(
+            discount_percent=REFERRAL_OWNER_DISCOUNT,
+            discount_source="referral_reward",
+            discount_label=describe_discount(REFERRAL_OWNER_DISCOUNT, "referral_reward"),
+        )
     if user.referred_by_user_id and user.referred_discount_used_at is None:
-        return REFERRAL_WELCOME_DISCOUNT
-    return 0
+        return EffectiveDiscountInfo(
+            discount_percent=REFERRAL_WELCOME_DISCOUNT,
+            discount_source="referral_welcome",
+            discount_label=describe_discount(REFERRAL_WELCOME_DISCOUNT, "referral_welcome"),
+        )
+    return EffectiveDiscountInfo()
+
+
+async def get_current_slot_discount_percent(session: AsyncSession, user: User) -> int:
+    info = await get_effective_discount_info(session, user)
+    return info.discount_percent
 
 
 async def touch_referral_copy(session: AsyncSession, user: User) -> None:
@@ -64,9 +101,8 @@ async def register_referral_from_start(
         return False
     if user.referred_by_user_id is not None or user.telegram_id == referrer_telegram_id:
         return False
-    existing_booking = await session.execute(
-        select(Booking.id).where(Booking.user_id == user.id).limit(1)
-    )
+
+    existing_booking = await session.execute(select(Booking.id).where(Booking.user_id == user.id).limit(1))
     if existing_booking.scalar_one_or_none() is not None:
         return False
 
@@ -87,6 +123,16 @@ async def apply_referral_to_booking(
     user: User,
 ) -> ReferralBookingOutcome:
     now = datetime.now(UTC)
+
+    if user.admin_discount_percent is not None:
+        if user.admin_discount_percent > 0:
+            booking.discount_percent = user.admin_discount_percent
+            booking.discount_source = "admin_manual"
+            return ReferralBookingOutcome(
+                discount_percent=booking.discount_percent,
+                discount_label=describe_discount(booking.discount_percent, booking.discount_source),
+            )
+        return ReferralBookingOutcome()
 
     reward_result = await session.execute(
         select(ReferralReward)
@@ -114,9 +160,7 @@ async def apply_referral_to_booking(
         booking.discount_percent = REFERRAL_WELCOME_DISCOUNT
         booking.discount_source = "referral_welcome"
 
-        owner_result = await session.execute(
-            select(User).where(User.id == user.referred_by_user_id).limit(1)
-        )
+        owner_result = await session.execute(select(User).where(User.id == user.referred_by_user_id).limit(1))
         owner = owner_result.scalar_one_or_none()
 
         reward = ReferralReward(
