@@ -6,6 +6,7 @@ from sqlalchemy import select, text
 from app.bot import notify_student_reminder
 from app.db import SessionLocal
 from app.models import AvailabilitySlot, Booking, User
+from app.time_utils import format_slot_range
 
 REMINDER_WINDOW_HOURS = 8
 REMINDER_CHECK_INTERVAL_SECONDS = 300
@@ -150,8 +151,7 @@ async def send_due_reminders() -> None:
         rows = result.all()
 
         for booking, user, slot in rows:
-            start_at = slot.start_at.astimezone().strftime("%d.%m.%Y %H:%M")
-            end_at = slot.end_at.astimezone().strftime("%H:%M")
+            start_at, end_at = format_slot_range(slot.start_at, slot.end_at)
             await notify_student_reminder(
                 telegram_id=user.telegram_id,
                 start_at=start_at,

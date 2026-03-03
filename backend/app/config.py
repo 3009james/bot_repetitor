@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     admin_telegram_id: int
     app_url: str
     database_url: str
+    app_timezone: str = "Europe/Moscow"
     upload_dir: str = "/app/data/uploads"
     dev_bypass_auth: bool = False
 
@@ -17,4 +18,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

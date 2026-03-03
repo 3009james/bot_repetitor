@@ -23,6 +23,7 @@ from app.referrals import (
     rollback_referral_on_cancellation,
     touch_referral_copy,
 )
+from app.time_utils import format_slot_range
 from app.schemas import (
     BookingInfo,
     MeResponse,
@@ -191,8 +192,7 @@ async def create_booking(
     await session.commit()
     await session.refresh(booking)
 
-    slot_start = slot.start_at.astimezone().strftime("%d.%m.%Y %H:%M")
-    slot_end = slot.end_at.astimezone().strftime("%H:%M")
+    slot_start, slot_end = format_slot_range(slot.start_at, slot.end_at)
     start_label = slot_start
     if referral_outcome.discount_label:
         start_label = f"{slot_start} | {referral_outcome.discount_label}"
@@ -247,8 +247,7 @@ async def cancel_booking(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена")
 
     booking, slot = booking_row
-    slot_start = slot.start_at.astimezone().strftime("%d.%m.%Y %H:%M")
-    slot_end = slot.end_at.astimezone().strftime("%H:%M")
+    slot_start, slot_end = format_slot_range(slot.start_at, slot.end_at)
 
     await rollback_referral_on_cancellation(session, booking, current_user)
     await session.delete(booking)

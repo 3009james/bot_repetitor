@@ -13,6 +13,7 @@ from app.dependencies import require_admin
 from app.models import AvailabilitySlot, Booking, User
 from app.referrals import get_effective_discount_info, rollback_referral_on_cancellation
 from app.routers.public import build_profile_payload, get_or_create_profile
+from app.time_utils import format_slot_range
 from app.schemas import (
     BookingListItem,
     ProfileUpdate,
@@ -266,8 +267,7 @@ async def cancel_booking(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена")
 
     booking, user, slot = row
-    slot_start = slot.start_at.astimezone().strftime("%d.%m.%Y %H:%M")
-    slot_end = slot.end_at.astimezone().strftime("%H:%M")
+    slot_start, slot_end = format_slot_range(slot.start_at, slot.end_at)
 
     await rollback_referral_on_cancellation(session, booking, user)
     await session.delete(booking)
