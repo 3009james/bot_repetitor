@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -6,23 +6,15 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot import notify_admin_cancellation, notify_student_cancellation
+from app.bot import notify_admin_cancellation, notify_referral_reward, notify_student_booking, notify_student_cancellation
 from app.config import get_settings
 from app.db import get_session
 from app.dependencies import require_admin
 from app.models import AvailabilitySlot, Booking, User
-from app.referrals import get_effective_discount_info, rollback_referral_on_cancellation
+from app.referrals import apply_referral_to_booking, get_effective_discount_info, rollback_referral_on_cancellation
 from app.routers.public import build_profile_payload, get_or_create_profile
+from app.schemas import BookingListItem, ProfileUpdate, SlotCreate, SlotOut, StudentDiscountItem, StudentDiscountUpdate, TutorProfileOut
 from app.time_utils import format_slot_range
-from app.schemas import (
-    BookingListItem,
-    ProfileUpdate,
-    SlotCreate,
-    SlotOut,
-    StudentDiscountItem,
-    StudentDiscountUpdate,
-    TutorProfileOut,
-)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -81,7 +73,6 @@ async def upload_profile_photo(
     profile.tutor_photo_path = f"/uploads/{filename}"
     await session.commit()
     await session.refresh(profile)
-
     return build_profile_payload(profile)
 
 
@@ -119,6 +110,7 @@ async def create_slot(
         start_at=payload.start_at,
         end_at=payload.start_at + timedelta(minutes=payload.duration_minutes),
         is_active=True,
+        requires_approval=payload.requires_approval,
     )
     session.add(slot)
     await session.commit()
@@ -180,6 +172,8 @@ async def list_bookings(
             user_telegram_id=user.telegram_id,
             start_at=slot.start_at,
             end_at=slot.end_at,
+            status=booking.status,
+            requires_approval=slot.requires_approval,
             discount_percent=booking.discount_percent,
         )
         for booking, user, slot in rows
@@ -199,9 +193,7 @@ async def list_students(
     users = list(result.scalars().all())
     items: list[StudentDiscountItem] = []
     for user in users:
-        bookings_count_result = await session.execute(
-            select(func.count(Booking.id)).where(Booking.user_id == user.id)
-        )
+        bookings_count_result = await session.execute(select(func.count(Booking.id)).where(Booking.user_id == user.id))
         effective_discount = await get_effective_discount_info(session, user)
         items.append(
             StudentDiscountItem(
@@ -233,9 +225,7 @@ async def update_student_discount(
     await session.commit()
     await session.refresh(user)
 
-    bookings_count_result = await session.execute(
-        select(func.count(Booking.id)).where(Booking.user_id == user.id)
-    )
+    bookings_count_result = await session.execute(select(func.count(Booking.id)).where(Booking.user_id == user.id))
     effective_discount = await get_effective_discount_info(session, user)
     return StudentDiscountItem(
         id=user.id,
@@ -269,7 +259,8 @@ async def cancel_booking(
     booking, user, slot = row
     slot_start, slot_end = format_slot_range(slot.start_at, slot.end_at)
 
-    await rollback_referral_on_cancellation(session, booking, user)
+    if booking.status == "confirmed":
+        await rollback_referral_on_cancellation(session, booking, user)
     await session.delete(booking)
     await session.commit()
 
@@ -286,4 +277,92 @@ async def cancel_booking(
         start_at=slot_start,
         end_at=slot_end,
         cancelled_by="администратор",
+    )
+
+
+@router.post("/bookings/{booking_id}/approve", response_model=BookingListItem)
+async def approve_booking(
+    booking_id: int,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> BookingListItem:
+    result = await session.execute(
+        select(Booking, User, AvailabilitySlot)
+        .join(User, Booking.user_id == User.id)
+        .join(AvailabilitySlot, Booking.slot_id == AvailabilitySlot.id)
+        .where(Booking.id == booking_id)
+        .limit(1)
+        .with_for_update()
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена")
+
+    booking, user, slot = row
+    if booking.status != "pending":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Заявка уже обработана")
+    if slot.start_at < datetime.now(UTC):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Время слота уже прошло")
+
+    referral_outcome = await apply_referral_to_booking(session, booking, user)
+    booking.status = "confirmed"
+    await session.commit()
+    await session.refresh(booking)
+
+    slot_start, slot_end = format_slot_range(slot.start_at, slot.end_at)
+    await notify_student_booking(
+        telegram_id=user.telegram_id,
+        start_at=slot_start,
+        end_at=slot_end,
+    )
+    if referral_outcome.reward_owner_telegram_id:
+        await notify_referral_reward(
+            telegram_id=referral_outcome.reward_owner_telegram_id,
+            invited_name=user.first_name,
+        )
+
+    return BookingListItem(
+        id=booking.id,
+        created_at=booking.created_at,
+        user_first_name=user.first_name,
+        username=user.username,
+        user_telegram_id=user.telegram_id,
+        start_at=slot.start_at,
+        end_at=slot.end_at,
+        status=booking.status,
+        requires_approval=slot.requires_approval,
+        discount_percent=booking.discount_percent,
+    )
+
+
+@router.post("/bookings/{booking_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
+async def reject_booking(
+    booking_id: int,
+    session: AsyncSession = Depends(get_session),
+    _: User = Depends(require_admin),
+) -> None:
+    result = await session.execute(
+        select(Booking, User, AvailabilitySlot)
+        .join(User, Booking.user_id == User.id)
+        .join(AvailabilitySlot, Booking.slot_id == AvailabilitySlot.id)
+        .where(Booking.id == booking_id)
+        .limit(1)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Запись не найдена")
+
+    booking, user, slot = row
+    if booking.status != "pending":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Отклонить можно только ожидающую заявку")
+
+    slot_start, slot_end = format_slot_range(slot.start_at, slot.end_at)
+    await session.delete(booking)
+    await session.commit()
+
+    await notify_student_cancellation(
+        telegram_id=user.telegram_id,
+        start_at=slot_start,
+        end_at=slot_end,
+        cancelled_by="администратор (заявка отклонена)",
     )

@@ -119,6 +119,10 @@
                 Длительность, минут
                 <input id="slot-duration" type="number" min="30" max="240" step="30" value="60" required />
               </label>
+              <label class="checkbox-row">
+                <input id="slot-requires-approval" type="checkbox" />
+                <span>По согласованию (запись после подтверждения)</span>
+              </label>
               <button class="primary-button" type="submit">Добавить слот</button>
             </form>
           </div>
@@ -190,6 +194,25 @@
           <button id="close-portfolio-button" class="ghost-button" type="button">Закрыть</button>
         </div>
         <div id="portfolio-list" class="portfolio-list"></div>
+      </div>
+    </div>
+
+    <div id="booking-modal" class="modal hidden">
+      <div class="modal-backdrop" data-close-booking-modal="true"></div>
+      <div class="modal-card booking-modal-card">
+        <div class="modal-header">
+          <div>
+            <p class="section-label">Подтверждение</p>
+            <h3 id="booking-modal-title">Запись на занятие</h3>
+          </div>
+          <button class="ghost-button" type="button" data-close-booking-modal="true">Закрыть</button>
+        </div>
+        <p id="booking-modal-text" class="booking-modal-text"></p>
+        <div class="booking-modal-actions">
+          <button id="booking-confirm-button" class="primary-button" type="button">Подтвердить</button>
+          <button id="booking-contact-button" class="secondary-button hidden" type="button">Написать преподавателю</button>
+          <button class="ghost-button" type="button" data-close-booking-modal="true">Отмена</button>
+        </div>
       </div>
     </div>
 

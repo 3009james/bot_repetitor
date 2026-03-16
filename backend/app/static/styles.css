@@ -257,6 +257,21 @@ h3 {
   color: var(--success);
 }
 
+.booking-pending,
+.booking-confirmed {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.booking-pending {
+  color: #ffd58b;
+}
+
+.booking-confirmed {
+  color: #9fc4ff;
+}
+
 .status-card-actions {
   margin-top: 14px;
 }
@@ -373,6 +388,10 @@ h3 {
   text-align: left;
 }
 
+.slot-button .slot-meta {
+  color: var(--muted);
+}
+
 .slots-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -421,6 +440,18 @@ h3 {
   color: var(--muted);
 }
 
+.checkbox-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 10px !important;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}
+
 input,
 textarea {
   width: 100%;
@@ -463,6 +494,19 @@ textarea {
 .list-item strong,
 .list-item span {
   display: block;
+}
+
+.list-item > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.booking-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .student-card {
@@ -537,6 +581,23 @@ textarea {
   gap: 16px;
 }
 
+.booking-modal-card {
+  width: min(560px, calc(100vw - 24px));
+}
+
+.booking-modal-text {
+  margin-top: 16px;
+  color: #d9e6ff;
+  line-height: 1.6;
+}
+
+.booking-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
 .portfolio-list {
   display: grid;
   gap: 18px;
@@ -583,6 +644,10 @@ textarea {
 
   .student-card {
     grid-template-columns: 1fr;
+  }
+
+  .list-item > div:last-child {
+    align-items: flex-start;
   }
 
   .days-nav {

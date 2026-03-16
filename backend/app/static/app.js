@@ -7,6 +7,7 @@ const state = {
   adminBookings: [],
   students: [],
   selectedDay: null,
+  selectedBookingSlotId: null,
   daysDrag: {
     active: false,
     startX: 0,
@@ -15,9 +16,9 @@ const state = {
 };
 
 const DEFAULT_STUDENT_AVATAR =
-  "data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'%3e%3crect width='128' height='128' rx='28' fill='%2313284c'/%3e%3ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' fill='%23edf4ff' font-family='Segoe UI' font-size='34'%3eTG%3c/text%3e%3c/svg%3e";
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='20' fill='%2313284c'/%3E%3C/svg%3E";
 const DEFAULT_TUTOR_PHOTO =
-  "data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='640' height='640' viewBox='0 0 640 640'%3e%3crect width='640' height='640' rx='36' fill='%2313284c'/%3e%3ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23edf4ff' font-family='Segoe UI' font-size='44'%3e%D0%A4%D0%BE%D1%82%D0%BE%3c/text%3e%3c/svg%3e";
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 240'%3E%3Crect width='320' height='240' rx='20' fill='%2313284c'/%3E%3C/svg%3E";
 
 const elements = {
   studentAvatar: document.getElementById("student-avatar"),
@@ -48,6 +49,7 @@ const elements = {
   photoFile: document.getElementById("profile-photo-file"),
   slotDatetime: document.getElementById("slot-datetime"),
   slotDuration: document.getElementById("slot-duration"),
+  slotRequiresApproval: document.getElementById("slot-requires-approval"),
   portfolioArticlesText: document.getElementById("portfolio-articles-text"),
   portfolioProgramsText: document.getElementById("portfolio-programs-text"),
   portfolioEventsText: document.getElementById("portfolio-events-text"),
@@ -57,6 +59,11 @@ const elements = {
   portfolioModal: document.getElementById("portfolio-modal"),
   closePortfolioButton: document.getElementById("close-portfolio-button"),
   portfolioList: document.getElementById("portfolio-list"),
+  bookingModal: document.getElementById("booking-modal"),
+  bookingModalTitle: document.getElementById("booking-modal-title"),
+  bookingModalText: document.getElementById("booking-modal-text"),
+  bookingConfirmButton: document.getElementById("booking-confirm-button"),
+  bookingContactButton: document.getElementById("booking-contact-button"),
   adminSlots: document.getElementById("admin-slots"),
   adminBookings: document.getElementById("admin-bookings"),
   refreshButton: document.getElementById("refresh-button"),
@@ -69,7 +76,6 @@ function initTelegram() {
   if (!tg) {
     return;
   }
-
   tg.ready();
   tg.expand();
   tg.setHeaderColor("#091224");
@@ -80,17 +86,14 @@ function getTelegramInitData() {
   if (tg?.initData) {
     return tg.initData;
   }
-
   const fromHash = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("tgWebAppData");
   if (fromHash) {
     return fromHash;
   }
-
   const fromSearch = new URLSearchParams(window.location.search).get("tgWebAppData");
   if (fromSearch) {
     return fromSearch;
   }
-
   return "";
 }
 
@@ -100,7 +103,6 @@ async function apiFetch(path, options = {}) {
   if (initData) {
     headers.set("X-Telegram-Init-Data", initData);
   }
-
   const response = await fetch(path, { ...options, headers });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
@@ -148,6 +150,14 @@ function confirmAction(message) {
   return Promise.resolve(window.confirm(message));
 }
 
+function bookingStatusText(status) {
+  return status === "pending" ? "Ожидает подтверждения" : "Подтверждено";
+}
+
+function bookingStatusClass(status) {
+  return status === "pending" ? "booking-pending" : "booking-confirmed";
+}
+
 function normalizeMeResponse(payload) {
   return {
     user: payload?.user || {
@@ -173,6 +183,7 @@ function normalizeMeResponse(payload) {
       reward_count: 0,
       referred_discount_available: false,
     },
+    teacher_contact_url: payload?.teacher_contact_url || null,
   };
 }
 
@@ -192,7 +203,6 @@ function setupDaysDesktopScroll() {
   if (!row || row.dataset.desktopScrollReady === "true") {
     return;
   }
-
   row.dataset.desktopScrollReady = "true";
 
   row.addEventListener(
@@ -225,7 +235,6 @@ function setupDaysDesktopScroll() {
     state.daysDrag.active = false;
     row.classList.remove("dragging");
   };
-
   window.addEventListener("mouseup", stopDragging);
   row.addEventListener("mouseleave", stopDragging);
 }
@@ -261,18 +270,60 @@ function openPortfolioModal() {
     return;
   }
   renderPortfolioModal();
-  elements.portfolioModal?.classList.remove("hidden");
+  elements.portfolioModal.classList.remove("hidden");
 }
 
 function closePortfolioModal() {
   elements.portfolioModal?.classList.add("hidden");
 }
 
+function openBookingModal(slot) {
+  if (!elements.bookingModal || !elements.bookingModalTitle || !elements.bookingModalText || !elements.bookingConfirmButton) {
+    return;
+  }
+  state.selectedBookingSlotId = slot.id;
+  const slotLabel = `${formatDate(slot.start_at, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} - ${formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" })}`;
+
+  if (slot.requires_approval) {
+    elements.bookingModalTitle.textContent = "Заявка по согласованию";
+    elements.bookingModalText.textContent = `Отправить преподавателю заявку на время ${slotLabel}?`;
+    elements.bookingConfirmButton.textContent = "Отправить запрос";
+    elements.bookingContactButton?.classList.remove("hidden");
+  } else {
+    elements.bookingModalTitle.textContent = "Подтвердите запись";
+    elements.bookingModalText.textContent = `Подтвердите запись на ${slotLabel}.`;
+    elements.bookingConfirmButton.textContent = "Подтвердить";
+    elements.bookingContactButton?.classList.add("hidden");
+  }
+  elements.bookingModal.classList.remove("hidden");
+}
+
+function closeBookingModal() {
+  state.selectedBookingSlotId = null;
+  elements.bookingModal?.classList.add("hidden");
+}
+
+function openTeacherChat() {
+  const contactUrl = state.me?.teacher_contact_url;
+  if (!contactUrl) {
+    notify("Контакт преподавателя пока не настроен.");
+    return;
+  }
+  if (tg?.openTelegramLink && contactUrl.startsWith("https://t.me/")) {
+    tg.openTelegramLink(contactUrl);
+    return;
+  }
+  if (tg?.openLink) {
+    tg.openLink(contactUrl);
+    return;
+  }
+  window.open(contactUrl, "_blank", "noopener,noreferrer");
+}
+
 function renderPromo() {
   if (!elements.promoStatus) {
     return;
   }
-
   const referral = state.me.referral;
   const statuses = [];
   if (referral.current_slot_discount_percent === 50) {
@@ -286,8 +337,7 @@ function renderPromo() {
   if (referral.link_copied) {
     statuses.push("Реферальная ссылка уже копировалась.");
   }
-  elements.promoStatus.textContent =
-    statuses.join(" ") || "Скопируйте ссылку и отправьте ее другу прямо из Telegram.";
+  elements.promoStatus.textContent = statuses.join(" ") || "Скопируйте ссылку и отправьте ее другу прямо из Telegram.";
 }
 
 function renderProfile() {
@@ -299,7 +349,6 @@ function renderProfile() {
   elements.aboutText.textContent = profile.about_text;
   elements.tutorPhoto.src = profile.tutor_photo_url || DEFAULT_TUTOR_PHOTO;
   elements.roleBadge.classList.toggle("hidden", !user.is_admin);
-
   renderPromo();
 
   if (upcomingBookings.length) {
@@ -311,16 +360,12 @@ function renderProfile() {
           (booking) => `
             <div class="list-item">
               <div>
-                <strong>${formatDate(booking.start_at, {
-                  day: "2-digit",
-                  month: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}</strong>
+                <strong>${formatDate(booking.start_at, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</strong>
                 <span>До ${formatDate(booking.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
+                <span class="${bookingStatusClass(booking.status)}">${bookingStatusText(booking.status)}</span>
                 ${booking.discount_label ? `<span class="discount-meta">${escapeHtml(booking.discount_label)}</span>` : ""}
               </div>
-              <button class="danger-button" data-cancel-own-booking="${booking.id}" type="button">Отменить</button>
+              <button class="danger-button" data-cancel-own-booking="${booking.id}" type="button">${booking.status === "pending" ? "Отменить заявку" : "Отменить"}</button>
             </div>
           `,
         )
@@ -348,6 +393,8 @@ function renderProfile() {
     if (elements.portfolioEventsText) {
       elements.portfolioEventsText.value = getPortfolioSection(2).text || "";
     }
+  } else {
+    elements.adminPanel.classList.add("hidden");
   }
 }
 
@@ -382,8 +429,8 @@ function renderSlots() {
       const end = formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" });
       return `
         <button class="slot-button" data-slot-id="${slot.id}" type="button">
-          <strong>${start} - ${end}</strong>
-          <span>Записаться</span>
+          <strong>${start} - ${end}${slot.requires_approval ? " (по согласованию)" : ""}</strong>
+          <span class="slot-meta">${slot.requires_approval ? "Забронировать по согласованию" : "Записаться"}</span>
           ${slot.discount_percent > 0 ? `<span class="slot-discount-badge">Скидка ${slot.discount_percent}%</span>` : ""}
         </button>
       `;
@@ -398,13 +445,9 @@ function renderAdminSlots() {
           (slot) => `
             <div class="list-item">
               <div>
-                <strong>${formatDate(slot.start_at, {
-                  day: "2-digit",
-                  month: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}</strong>
+                <strong>${formatDate(slot.start_at, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</strong>
                 <span>${formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
+                ${slot.requires_approval ? '<span class="booking-pending">По согласованию</span>' : ""}
               </div>
               <button class="danger-button" data-delete-slot="${slot.id}" type="button">Удалить</button>
             </div>
@@ -417,26 +460,32 @@ function renderAdminSlots() {
 function renderAdminBookings() {
   elements.adminBookings.innerHTML = state.adminBookings.length
     ? state.adminBookings
-        .map(
-          (booking) => `
+        .map((booking) => {
+          const actions =
+            booking.status === "pending"
+              ? `
+                <div class="booking-actions">
+                  <button class="primary-button" data-approve-booking="${booking.id}" type="button">Подтвердить</button>
+                  <button class="danger-button" data-reject-booking="${booking.id}" type="button">Отклонить</button>
+                </div>
+              `
+              : `<button class="danger-button" data-cancel-booking="${booking.id}" type="button">Отменить</button>`;
+
+          return `
             <div class="list-item">
               <div>
                 <strong>${escapeHtml(booking.user_first_name)}${booking.username ? ` (@${escapeHtml(booking.username)})` : ""}</strong>
-                <span>${formatDate(booking.start_at, {
-                  day: "2-digit",
-                  month: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })} - ${formatDate(booking.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
+                <span>${formatDate(booking.start_at, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} - ${formatDate(booking.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
+                <span class="${bookingStatusClass(booking.status)}">${bookingStatusText(booking.status)}${booking.requires_approval ? " | по согласованию" : ""}</span>
                 ${booking.discount_percent > 0 ? `<span class="discount-meta">Скидка ${booking.discount_percent}%</span>` : ""}
               </div>
               <div>
                 <span>ID: ${booking.user_telegram_id}</span>
-                <button class="danger-button" data-cancel-booking="${booking.id}" type="button">Отменить</button>
+                ${actions}
               </div>
             </div>
-          `,
-        )
+          `;
+        })
         .join("")
     : "<p>Записей пока нет.</p>";
 }
@@ -445,7 +494,6 @@ function renderStudents() {
   if (!elements.studentsList) {
     return;
   }
-
   elements.studentsList.innerHTML = state.students.length
     ? state.students
         .map(
@@ -458,15 +506,7 @@ function renderStudents() {
                 <span>${student.current_discount_label || "Скидки нет"}</span>
               </div>
               <div class="student-actions">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value="${student.admin_discount_percent ?? ""}"
-                  placeholder="Скидка %"
-                  data-student-discount-input="${student.id}"
-                />
+                <input type="number" min="0" max="100" step="1" value="${student.admin_discount_percent ?? ""}" placeholder="Скидка %" data-student-discount-input="${student.id}" />
                 <div class="student-buttons">
                   <button class="primary-button" data-save-student-discount="${student.id}" type="button">Сохранить</button>
                   <button class="danger-button" data-disable-student-discount="${student.id}" type="button">Убрать скидку</button>
@@ -514,8 +554,12 @@ async function refreshAll() {
 }
 
 async function createBooking(slotId) {
-  await apiFetch(`/api/bookings/${slotId}`, { method: "POST" });
-  notify("Запись подтверждена.");
+  const booking = await apiFetch(`/api/bookings/${slotId}`, { method: "POST" });
+  if (booking?.status === "pending") {
+    notify("Заявка отправлена преподавателю. Ожидайте подтверждения.");
+  } else {
+    notify("Запись подтверждена.");
+  }
   await refreshAll();
 }
 
@@ -528,6 +572,18 @@ async function cancelMyBooking(bookingId) {
 async function cancelBookingAsAdmin(bookingId) {
   await apiFetch(`/api/admin/bookings/${bookingId}`, { method: "DELETE" });
   notify("Запись отменена администратором.");
+  await refreshAll();
+}
+
+async function approveBookingAsAdmin(bookingId) {
+  await apiFetch(`/api/admin/bookings/${bookingId}/approve`, { method: "POST" });
+  notify("Заявка подтверждена.");
+  await refreshAll();
+}
+
+async function rejectBookingAsAdmin(bookingId) {
+  await apiFetch(`/api/admin/bookings/${bookingId}/reject`, { method: "POST" });
+  notify("Заявка отклонена.");
   await refreshAll();
 }
 
@@ -580,10 +636,16 @@ async function createSlot(event) {
     body: JSON.stringify({
       start_at: new Date(elements.slotDatetime.value).toISOString(),
       duration_minutes: Number(elements.slotDuration.value),
+      requires_approval: Boolean(elements.slotRequiresApproval?.checked),
     }),
   });
   elements.slotForm.reset();
-  elements.slotDuration.value = "60";
+  if (elements.slotDuration) {
+    elements.slotDuration.value = "60";
+  }
+  if (elements.slotRequiresApproval) {
+    elements.slotRequiresApproval.checked = false;
+  }
   await refreshAll();
 }
 
@@ -626,26 +688,45 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
-  const closePortfolio = event.target.closest("[data-close-portfolio]");
-  if (closePortfolio) {
+  if (event.target.closest("[data-close-portfolio]")) {
     closePortfolioModal();
+    return;
+  }
+
+  if (event.target.closest("[data-close-booking-modal]")) {
+    closeBookingModal();
     return;
   }
 
   const slotButton = event.target.closest("[data-slot-id]");
   if (slotButton) {
     const slot = state.slots.find((item) => String(item.id) === String(slotButton.dataset.slotId));
-    const slotLabel = slot
-      ? `${formatDate(slot.start_at, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} - ${formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" })}`
-      : "выбранное время";
-    if (!(await confirmAction(`Подтвердите запись на ${slotLabel}?`))) {
+    if (!slot) {
+      notify("Слот не найден.");
+      return;
+    }
+    openBookingModal(slot);
+    return;
+  }
+
+  if (event.target.closest("#booking-confirm-button")) {
+    const slot = state.slots.find((item) => String(item.id) === String(state.selectedBookingSlotId));
+    if (!slot) {
+      closeBookingModal();
+      notify("Слот больше недоступен.");
       return;
     }
     try {
-      await createBooking(slotButton.dataset.slotId);
+      await createBooking(slot.id);
+      closeBookingModal();
     } catch (error) {
       notify(error.message);
     }
+    return;
+  }
+
+  if (event.target.closest("#booking-contact-button")) {
+    openTeacherChat();
     return;
   }
 
@@ -672,6 +753,32 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  const approveButton = event.target.closest("[data-approve-booking]");
+  if (approveButton) {
+    if (!(await confirmAction("Подтвердить заявку ученика?"))) {
+      return;
+    }
+    try {
+      await approveBookingAsAdmin(approveButton.dataset.approveBooking);
+    } catch (error) {
+      notify(error.message);
+    }
+    return;
+  }
+
+  const rejectButton = event.target.closest("[data-reject-booking]");
+  if (rejectButton) {
+    if (!(await confirmAction("Отклонить заявку ученика?"))) {
+      return;
+    }
+    try {
+      await rejectBookingAsAdmin(rejectButton.dataset.rejectBooking);
+    } catch (error) {
+      notify(error.message);
+    }
+    return;
+  }
+
   const adminCancelButton = event.target.closest("[data-cancel-booking]");
   if (adminCancelButton) {
     if (!(await confirmAction("Отменить запись ученика?"))) {
@@ -687,9 +794,7 @@ document.addEventListener("click", async (event) => {
 
   const saveDiscountButton = event.target.closest("[data-save-student-discount]");
   if (saveDiscountButton) {
-    const input = document.querySelector(
-      `[data-student-discount-input="${saveDiscountButton.dataset.saveStudentDiscount}"]`,
-    );
+    const input = document.querySelector(`[data-student-discount-input="${saveDiscountButton.dataset.saveStudentDiscount}"]`);
     const value = input?.value?.trim();
     if (!value) {
       notify("Введите процент скидки от 0 до 100.");
@@ -811,6 +916,7 @@ elements.toggleStudentsButton?.addEventListener("click", () => {
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closePortfolioModal();
+    closeBookingModal();
   }
 });
 

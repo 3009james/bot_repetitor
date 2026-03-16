@@ -7,11 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.bot import (
     get_bot_username,
     notify_admin_booking,
+    notify_admin_booking_request,
     notify_admin_cancellation,
     notify_referral_reward,
     notify_student_booking,
+    notify_student_booking_pending,
     notify_student_cancellation,
 )
+from app.config import get_settings
 from app.db import get_session
 from app.dependencies import get_current_user
 from app.models import AvailabilitySlot, Booking, TutorProfile, User
@@ -79,6 +82,25 @@ def build_referral_link(user: User) -> str | None:
     return f"https://t.me/{bot_username}?start=ref_{user.telegram_id}"
 
 
+async def get_teacher_contact_url(session: AsyncSession) -> str | None:
+    settings = get_settings()
+    if settings.teacher_telegram_username:
+        username = settings.teacher_telegram_username.lstrip("@").strip()
+        if username:
+            return f"https://t.me/{username}"
+
+    admin_result = await session.execute(
+        select(User.username)
+        .where(User.is_admin.is_(True), User.username.is_not(None))
+        .order_by(User.created_at.asc())
+        .limit(1)
+    )
+    admin_username = admin_result.scalar_one_or_none()
+    if admin_username:
+        return f"https://t.me/{admin_username}"
+    return None
+
+
 async def build_referral_info(session: AsyncSession, current_user: User) -> ReferralInfoOut:
     current_discount_percent = await get_current_slot_discount_percent(session, current_user)
     reward_count = await count_available_rewards(session, current_user.id)
@@ -116,6 +138,7 @@ async def read_me(
             start_at=slot.start_at,
             end_at=slot.end_at,
             created_at=booking.created_at,
+            status=booking.status,
             discount_percent=booking.discount_percent,
             discount_label=describe_discount(booking.discount_percent, booking.discount_source),
         )
@@ -133,6 +156,7 @@ async def read_me(
         profile=build_profile_payload(profile),
         upcoming_bookings=upcoming_bookings,
         referral=await build_referral_info(session, current_user),
+        teacher_contact_url=await get_teacher_contact_url(session),
     )
 
 
@@ -160,6 +184,7 @@ async def list_slots(
             id=slot.id,
             start_at=slot.start_at,
             end_at=slot.end_at,
+            requires_approval=slot.requires_approval,
             discount_percent=current_discount_percent,
         )
         for slot in result.scalars().all()
@@ -185,35 +210,53 @@ async def create_booking(
     if booking_exists.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Это время уже занято")
 
-    booking = Booking(user_id=current_user.id, slot_id=slot.id)
+    booking_status = "pending" if slot.requires_approval else "confirmed"
+    booking = Booking(user_id=current_user.id, slot_id=slot.id, status=booking_status)
     session.add(booking)
     await session.flush()
-    referral_outcome = await apply_referral_to_booking(session, booking, current_user)
-    await session.commit()
-    await session.refresh(booking)
 
     slot_start, slot_end = format_slot_range(slot.start_at, slot.end_at)
-    start_label = slot_start
-    if referral_outcome.discount_label:
-        start_label = f"{slot_start} | {referral_outcome.discount_label}"
-
-    await notify_admin_booking(
-        student_name=current_user.first_name,
-        student_username=current_user.username,
-        student_telegram_id=current_user.telegram_id,
-        start_at=start_label,
-        end_at=slot_end,
-    )
-    await notify_student_booking(
-        telegram_id=current_user.telegram_id,
-        start_at=slot_start,
-        end_at=slot_end,
-    )
-    if referral_outcome.reward_owner_telegram_id:
-        await notify_referral_reward(
-            telegram_id=referral_outcome.reward_owner_telegram_id,
-            invited_name=current_user.first_name,
+    if slot.requires_approval:
+        await session.commit()
+        await session.refresh(booking)
+        await notify_admin_booking_request(
+            student_name=current_user.first_name,
+            student_username=current_user.username,
+            student_telegram_id=current_user.telegram_id,
+            start_at=slot_start,
+            end_at=slot_end,
         )
+        await notify_student_booking_pending(
+            telegram_id=current_user.telegram_id,
+            start_at=slot_start,
+            end_at=slot_end,
+        )
+    else:
+        referral_outcome = await apply_referral_to_booking(session, booking, current_user)
+        await session.commit()
+        await session.refresh(booking)
+
+        start_label = slot_start
+        if referral_outcome.discount_label:
+            start_label = f"{slot_start} | {referral_outcome.discount_label}"
+
+        await notify_admin_booking(
+            student_name=current_user.first_name,
+            student_username=current_user.username,
+            student_telegram_id=current_user.telegram_id,
+            start_at=start_label,
+            end_at=slot_end,
+        )
+        await notify_student_booking(
+            telegram_id=current_user.telegram_id,
+            start_at=slot_start,
+            end_at=slot_end,
+        )
+        if referral_outcome.reward_owner_telegram_id:
+            await notify_referral_reward(
+                telegram_id=referral_outcome.reward_owner_telegram_id,
+                invited_name=current_user.first_name,
+            )
 
     return BookingInfo(
         id=booking.id,
@@ -221,6 +264,7 @@ async def create_booking(
         start_at=slot.start_at,
         end_at=slot.end_at,
         created_at=booking.created_at,
+        status=booking.status,
         discount_percent=booking.discount_percent,
         discount_label=describe_discount(booking.discount_percent, booking.discount_source),
     )
@@ -249,7 +293,8 @@ async def cancel_booking(
     booking, slot = booking_row
     slot_start, slot_end = format_slot_range(slot.start_at, slot.end_at)
 
-    await rollback_referral_on_cancellation(session, booking, current_user)
+    if booking.status == "confirmed":
+        await rollback_referral_on_cancellation(session, booking, current_user)
     await session.delete(booking)
     await session.commit()
 

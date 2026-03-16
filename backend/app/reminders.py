@@ -129,6 +129,22 @@ async def ensure_runtime_schema() -> None:
                 """
             )
         )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE bookings
+                ADD COLUMN IF NOT EXISTS status VARCHAR(32) NOT NULL DEFAULT 'confirmed'
+                """
+            )
+        )
+        await session.execute(
+            text(
+                """
+                ALTER TABLE availability_slots
+                ADD COLUMN IF NOT EXISTS requires_approval BOOLEAN NOT NULL DEFAULT FALSE
+                """
+            )
+        )
         await session.commit()
 
 
@@ -143,6 +159,7 @@ async def send_due_reminders() -> None:
             .join(AvailabilitySlot, Booking.slot_id == AvailabilitySlot.id)
             .where(
                 Booking.reminder_sent_at.is_(None),
+                Booking.status == "confirmed",
                 AvailabilitySlot.start_at > now,
                 AvailabilitySlot.start_at <= reminder_threshold,
             )

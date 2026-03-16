@@ -69,6 +69,7 @@ class AvailabilitySlot(Base):
     start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    requires_approval: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     booking: Mapped["Booking | None"] = relationship(back_populates="slot", uselist=False)
@@ -86,6 +87,7 @@ class Booking(Base):
         index=True,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    status: Mapped[str] = mapped_column(String(32), default="confirmed", nullable=False)
     reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     discount_percent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     discount_source: Mapped[str | None] = mapped_column(String(64), nullable=True)

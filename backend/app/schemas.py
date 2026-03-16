@@ -30,6 +30,7 @@ class BookingInfo(BaseModel):
     start_at: datetime
     end_at: datetime
     created_at: datetime
+    status: str = "confirmed"
     discount_percent: int = 0
     discount_label: str | None = None
 
@@ -49,12 +50,14 @@ class MeResponse(BaseModel):
     profile: TutorProfileOut
     upcoming_bookings: list[BookingInfo]
     referral: ReferralInfoOut
+    teacher_contact_url: str | None = None
 
 
 class SlotOut(BaseModel):
     id: int
     start_at: datetime
     end_at: datetime
+    requires_approval: bool = False
     discount_percent: int = 0
 
     model_config = ConfigDict(from_attributes=True)
@@ -63,6 +66,7 @@ class SlotOut(BaseModel):
 class SlotCreate(BaseModel):
     start_at: datetime
     duration_minutes: int = Field(default=60, ge=30, le=240)
+    requires_approval: bool = False
 
 
 class ProfileUpdate(BaseModel):
@@ -81,6 +85,8 @@ class BookingListItem(BaseModel):
     user_telegram_id: int
     start_at: datetime
     end_at: datetime
+    status: str = "confirmed"
+    requires_approval: bool = False
     discount_percent: int = 0
 
 

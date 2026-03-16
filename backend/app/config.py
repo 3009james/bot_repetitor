@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     database_url: str
     app_timezone: str = "Europe/Moscow"
     upload_dir: str = "/app/data/uploads"
+    teacher_telegram_username: str | None = None
     dev_bypass_auth: bool = False
 
 
