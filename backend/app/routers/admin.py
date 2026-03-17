@@ -6,7 +6,13 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot import notify_admin_cancellation, notify_referral_reward, notify_student_booking, notify_student_cancellation
+from app.bot import (
+    notify_admin_cancellation,
+    notify_referral_reward,
+    notify_student_booking,
+    notify_student_booking_rejected,
+    notify_student_cancellation,
+)
 from app.config import get_settings
 from app.db import get_session
 from app.dependencies import require_admin
@@ -360,9 +366,8 @@ async def reject_booking(
     await session.delete(booking)
     await session.commit()
 
-    await notify_student_cancellation(
+    await notify_student_booking_rejected(
         telegram_id=user.telegram_id,
         start_at=slot_start,
         end_at=slot_end,
-        cancelled_by="администратор (заявка отклонена)",
     )

@@ -129,11 +129,12 @@ async def notify_admin_booking_request(
 ) -> None:
     username_part = f"@{student_username}" if student_username else "без username"
     text = (
-        "Новая заявка по согласованию\n\n"
+        "Новая заявка на занятие по согласованию\n\n"
         f"Ученик: {student_name}\n"
         f"Username: {username_part}\n"
         f"Telegram ID: {student_telegram_id}\n"
-        f"Время: {start_at} - {end_at}\n\n"
+        f"Время: {start_at} - {end_at}\n"
+        "Статус: ожидает подтверждения\n\n"
         "Откройте админ-панель мини-приложения, чтобы подтвердить или отклонить заявку."
     )
     try:
@@ -163,6 +164,18 @@ async def notify_student_booking_pending(
         f"Заявка на занятие отправлена: {start_at} - {end_at}. "
         "Ожидайте подтверждения преподавателя."
     )
+    try:
+        await bot.send_message(telegram_id, text)
+    except Exception:
+        pass
+
+
+async def notify_student_booking_rejected(
+    telegram_id: int,
+    start_at: str,
+    end_at: str,
+) -> None:
+    text = f"Заявка на занятие {start_at} - {end_at} отклонена преподавателем."
     try:
         await bot.send_message(telegram_id, text)
     except Exception:

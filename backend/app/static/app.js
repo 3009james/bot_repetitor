@@ -151,7 +151,7 @@ function confirmAction(message) {
 }
 
 function bookingStatusText(status) {
-  return status === "pending" ? "Ожидает подтверждения" : "Подтверждено";
+  return status === "pending" ? "Ожидает согласования с преподавателем" : "Подтверждено";
 }
 
 function bookingStatusClass(status) {
@@ -285,9 +285,11 @@ function openBookingModal(slot) {
   const slotLabel = `${formatDate(slot.start_at, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} - ${formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" })}`;
 
   if (slot.requires_approval) {
-    elements.bookingModalTitle.textContent = "Заявка по согласованию";
-    elements.bookingModalText.textContent = `Отправить преподавателю заявку на время ${slotLabel}?`;
-    elements.bookingConfirmButton.textContent = "Отправить запрос";
+    elements.bookingModalTitle.textContent = "Запись по согласованию";
+    elements.bookingModalText.textContent =
+      "На это занятие можно записаться по предварительному согласованию с преподавателем. " +
+      `Выбранное время: ${slotLabel}.`;
+    elements.bookingConfirmButton.textContent = "Записаться";
     elements.bookingContactButton?.classList.remove("hidden");
   } else {
     elements.bookingModalTitle.textContent = "Подтвердите запись";
@@ -429,8 +431,8 @@ function renderSlots() {
       const end = formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" });
       return `
         <button class="slot-button" data-slot-id="${slot.id}" type="button">
-          <strong>${start} - ${end}${slot.requires_approval ? " (по согласованию)" : ""}</strong>
-          <span class="slot-meta">${slot.requires_approval ? "Забронировать по согласованию" : "Записаться"}</span>
+          <strong>${start} - ${end}${slot.requires_approval ? " (по согласованию с преподавателем)" : ""}</strong>
+          <span class="slot-meta">${slot.requires_approval ? "Записаться по согласованию" : "Записаться"}</span>
           ${slot.discount_percent > 0 ? `<span class="slot-discount-badge">Скидка ${slot.discount_percent}%</span>` : ""}
         </button>
       `;
@@ -447,7 +449,7 @@ function renderAdminSlots() {
               <div>
                 <strong>${formatDate(slot.start_at, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</strong>
                 <span>${formatDate(slot.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
-                ${slot.requires_approval ? '<span class="booking-pending">По согласованию</span>' : ""}
+                ${slot.requires_approval ? '<span class="booking-pending">По согласованию с преподавателем</span>' : ""}
               </div>
               <button class="danger-button" data-delete-slot="${slot.id}" type="button">Удалить</button>
             </div>
@@ -476,7 +478,7 @@ function renderAdminBookings() {
               <div>
                 <strong>${escapeHtml(booking.user_first_name)}${booking.username ? ` (@${escapeHtml(booking.username)})` : ""}</strong>
                 <span>${formatDate(booking.start_at, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} - ${formatDate(booking.end_at, { hour: "2-digit", minute: "2-digit" })}</span>
-                <span class="${bookingStatusClass(booking.status)}">${bookingStatusText(booking.status)}${booking.requires_approval ? " | по согласованию" : ""}</span>
+                <span class="${bookingStatusClass(booking.status)}">${bookingStatusText(booking.status)}${booking.requires_approval ? " | по согласованию с преподавателем" : ""}</span>
                 ${booking.discount_percent > 0 ? `<span class="discount-meta">Скидка ${booking.discount_percent}%</span>` : ""}
               </div>
               <div>
@@ -556,7 +558,7 @@ async function refreshAll() {
 async function createBooking(slotId) {
   const booking = await apiFetch(`/api/bookings/${slotId}`, { method: "POST" });
   if (booking?.status === "pending") {
-    notify("Заявка отправлена преподавателю. Ожидайте подтверждения.");
+    notify("Заявка отправлена преподавателю на предварительное согласование.");
   } else {
     notify("Запись подтверждена.");
   }
